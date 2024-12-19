@@ -1,0 +1,5 @@
+.venv/
+**/*.csv
+**/*.xlsx
+**/*.json
+**/*.pkl
