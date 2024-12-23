@@ -4,4 +4,4 @@ sentence-transformers
 scikit-learn
 faiss-cpu
 numpy
-pickle5
+dill
