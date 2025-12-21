@@ -3,3 +3,5 @@
 **/*.xlsx
 **/*.json
 **/*.pkl
+**/data/
+__pycache__/
