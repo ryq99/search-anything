@@ -5,3 +5,5 @@
 **/*.pkl
 **/data/
 __pycache__/
+**/vector_store/
+**/*.db
