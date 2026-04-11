@@ -1,7 +1,19 @@
+# --- RAG pipeline ---
+docling
+langchain-docling
+langchain-core
+langchain-huggingface
+langchain-milvus
+pymilvus
+anthropic
+python-dotenv
+watchdog
 pandas
 torch
 sentence-transformers
-scikit-learn
+
+# --- Deprecated prototype (search.py) ---
 faiss-cpu
+scikit-learn
 numpy
 dill

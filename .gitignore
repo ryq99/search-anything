@@ -7,3 +7,7 @@
 __pycache__/
 **/vector_store/
 **/*.db
+**/*.ipynb
+.env*
+.DS_Store
+books/
