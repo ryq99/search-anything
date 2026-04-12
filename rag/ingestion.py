@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -65,10 +66,12 @@ def convert_pdf_to_markdown(pdf_path: Path) -> tuple[str, str]:
     print(f"[ingestion] Saved markdown: {out_file}")
 
     # Extract binary_hash from docling result
+    # Docling returns a uint64 which can exceed int64 max; always convert to hex string
     doc_dict = result.document.export_to_dict()
-    binary_hash = doc_dict.get("origin", {}).get("binary_hash", "")
-    if not binary_hash:
-        # Fallback: use file content hash
+    raw_hash = doc_dict.get("origin", {}).get("binary_hash")
+    if raw_hash:
+        binary_hash = hex(int(raw_hash))
+    else:
         import hashlib
         binary_hash = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
 
@@ -79,9 +82,30 @@ def convert_pdf_to_markdown(pdf_path: Path) -> tuple[str, str]:
 # Step 2: TOC extraction
 # ---------------------------------------------------------------------------
 
+_TOC_START = re.compile(
+    r'^#{0,6}\s*(table\s+of\s+contents|contents)\s*$',
+    re.IGNORECASE | re.MULTILINE,
+)
+
+# TOC window: enough for any textbook TOC, well under token limits
+_TOC_WINDOW = 50_000
+
+
+def _extract_toc_section(markdown_text: str) -> str:
+    """Find the TOC start marker and return a fixed window from there.
+    Falls back to the first 50k characters if no marker is found."""
+    start_match = _TOC_START.search(markdown_text)
+    if not start_match:
+        return markdown_text[:50_000]
+    start = start_match.start()
+    return markdown_text[start:start + _TOC_WINDOW]
+
+
 def extract_toc(markdown_text: str, stem: str) -> pd.DataFrame:
     """Extract hierarchical TOC from markdown using Claude. Saves *_toc.csv."""
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    toc_excerpt = _extract_toc_section(markdown_text)
 
     response = client.messages.create(
         model=TOC_MODEL,
@@ -103,7 +127,7 @@ def extract_toc(markdown_text: str, stem: str) -> pd.DataFrame:
                     "Include the section number and section title at every level.\n\n"
                     "Example:\n"
                     "1 Introduction => 1.2 Random Variables => 1.2.2 Distributions\n\n"
-                    f"{markdown_text}"
+                    f"{toc_excerpt}"
                 ),
             },
         ],
@@ -155,6 +179,9 @@ def chunk_and_enrich(
     )
     docs = loader.load()
 
+    # Fit the hash into Milvus int64 (schema was created as int64 on first ingest)
+    binary_hash_int64 = int(binary_hash, 16) % (2 ** 63)
+
     splits = []
     parent_headings_text: dict[str, str] = {}
 
@@ -167,7 +194,7 @@ def chunk_and_enrich(
             splits.append(Document(
                 page_content=doc.page_content,
                 metadata={
-                    "binary_hash": binary_hash,
+                    "binary_hash": binary_hash_int64,
                     "filename": filename,
                     "headings": "",
                     "parent_headings": "",
@@ -217,7 +244,7 @@ def chunk_and_enrich(
         splits.append(Document(
             page_content=doc.page_content,
             metadata={
-                "binary_hash": binary_hash,
+                "binary_hash": binary_hash_int64,
                 "filename": filename,
                 "headings": headings_str,
                 "parent_headings": parent_headings_str,
@@ -247,21 +274,29 @@ async def _summarize_one(
     text: str,
 ) -> tuple[str, str]:
     async with semaphore:
-        response = await client.messages.create(
-            model=SUMMARY_MODEL,
-            max_tokens=SUMMARY_MAX_TOKENS,
-            system=(
-                "Summarize the book contents with condensed form in 3-4 sentences."
-                "Cover the main topics, definition, proof, methods, and applications if any."
-            ),
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"Summarize the following text:\n\n{text}",
-                },
-            ],
-        )
-        return parent_headings, response.content[0].text or ""
+        for attempt in range(5):
+            try:
+                response = await client.messages.create(
+                    model=SUMMARY_MODEL,
+                    max_tokens=SUMMARY_MAX_TOKENS,
+                    system=(
+                        "Summarize the book contents with condensed form in 3-4 sentences."
+                        "Cover the main topics, definition, proof, methods, and applications if any."
+                    ),
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"Summarize the following text:\n\n{text}",
+                        },
+                    ],
+                )
+                return parent_headings, response.content[0].text or ""
+            except anthropic.RateLimitError:
+                if attempt == 4:
+                    raise
+                wait = 60 * (2 ** attempt)
+                print(f"[ingestion] Rate limited, retrying in {wait}s... (attempt {attempt + 1}/5)")
+                await asyncio.sleep(wait)
 
 
 async def summarize_all_parent_headings(
