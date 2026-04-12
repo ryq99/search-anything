@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from rag import ask, ingest_books, start_watcher
+from rag import ask, ingest_books, ingest_pdf, start_watcher
 from rag.config import BOOKS_DIR
 
 
@@ -23,7 +23,11 @@ def main():
     ask_parser = subparsers.add_parser("ask", help="Ask a machine learning question")
     ask_parser.add_argument("question", type=str, help="Your question")
 
-    subparsers.add_parser("ingest", help="One-shot ingest all PDFs in books/")
+    ingest_parser = subparsers.add_parser("ingest", help="One-shot ingest all PDFs in books/")
+    ingest_parser.add_argument(
+        "--paths", nargs="+", type=Path, metavar="PDF",
+        help="Specific PDF file(s) to ingest (default: all books in books/)",
+    )
 
     args = parser.parse_args()
 
@@ -35,7 +39,10 @@ def main():
         print(answer)
 
     elif args.command == "ingest":
-        results = ingest_books(BOOKS_DIR)
+        if args.paths:
+            results = [ingest_pdf(p) for p in args.paths]
+        else:
+            results = ingest_books(BOOKS_DIR)
         if results:
             print(f"\nIngested {len(results)} new book(s):")
             for r in results:
