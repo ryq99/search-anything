@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rag.core.models import ParseResult
+from rag.core.data_schemas import ParseResult
 
 # Extensions handled by each parser family
 _DOCLING_EXTENSIONS = {".pdf", ".docx", ".pptx"}
