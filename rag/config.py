@@ -19,6 +19,18 @@ EMBED_MODEL_ID    = "Snowflake/snowflake-arctic-embed-l-v2.0"
 VECTOR_STORE_NAME = "book_a_snowflake_arctic_embed"
 MILVUS_URI        = str(VECTOR_STORE_DIR / f"{VECTOR_STORE_NAME}.db")
 
+# --- Parsing ---
+# Which local parser handles pdf/docx/pptx: "docling" (ML layout model) or
+# "liteparse" (fast native spatial parser). Lets you A/B parse quality.
+LOCAL_PARSER = os.getenv("LOCAL_PARSER", "docling")  # "docling" | "liteparse"
+# OCR recovers text from scanned pages / embedded images. force_full_page=False
+# means clean text-layer pages stay fast; only failed pages invoke OCR.
+PARSER_ENABLE_OCR = os.getenv("PARSER_ENABLE_OCR", "true").lower() == "true"
+# Below this many chars, a parse is treated as a likely scanned/empty doc.
+PARSER_MIN_CONTENT_LENGTH = 500
+# VLM image description (figures/diagrams). Slow + needs a VLM endpoint; later step.
+PARSER_ENABLE_IMAGE_DESCRIPTION = False
+
 # --- Chunking ---
 CHUNK_MAX_TOKENS = 1024
 
