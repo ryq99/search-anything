@@ -1,34 +1,21 @@
 from pathlib import Path
 
 import pandas as pd
-from langchain_huggingface.embeddings import HuggingFaceEmbeddings
-from langchain_milvus import Milvus
 
-from rag.config import (
-    EMBED_MODEL_ID, VECTOR_STORE_NAME, MILVUS_URI,
-    RETRIEVAL_K, RETRIEVAL_EXPR,
-)
+from rag.config import RETRIEVAL_K, RETRIEVAL_EXPR
 
 
-def _get_vectorstore() -> Milvus:
-    """Lazy-init Milvus connection. Call once and reuse for Lambda warm paths."""
-    embedding = HuggingFaceEmbeddings(
-        model_name=EMBED_MODEL_ID,
-        model_kwargs={"trust_remote_code": True},
-    )
-    return Milvus(
-        embedding_function=embedding,
-        collection_name=VECTOR_STORE_NAME,
-        connection_args={"uri": MILVUS_URI},
-        index_params={"index_type": "FLAT"},
-    )
+def _get_vectorstore():
+    from rag.backends.factory import get_backend
+    return get_backend().vectorstore.get_store()
 
 
 def _load_summaries_for_books(registry: dict) -> pd.DataFrame:
     """Concatenate all per-book summary CSVs into one DataFrame."""
     frames = []
     for entry in registry.get("books", {}).values():
-        csv_path = entry.get("summary_csv", "")
+        # support both old key (summary_csv) and new key (summary_artifact_path)
+        csv_path = entry.get("summary_artifact_path") or entry.get("summary_csv", "")
         if csv_path and Path(csv_path).exists():
             frames.append(pd.read_csv(csv_path))
     if not frames:
@@ -40,7 +27,7 @@ def _load_summaries_for_books(registry: dict) -> pd.DataFrame:
 
 def retrieve(
     query: str,
-    vectorstore: Milvus | None = None,
+    vectorstore=None,
     summaries_df: pd.DataFrame | None = None,
 ) -> list[dict]:
     """
@@ -82,7 +69,6 @@ def retrieve(
 
 
 def format_retrieval_results(chunks: list[dict]) -> str:
-    """Format structured chunks into the exact string used in the synthesis prompt."""
     parts = []
     for c in chunks:
         parts.append(
