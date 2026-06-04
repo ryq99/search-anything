@@ -1,4 +1,4 @@
-# --- RAG pipeline ---
+# ── RAG pipeline ───────────────────────────────────────────
 docling
 langchain-docling
 langchain-core
@@ -12,8 +12,8 @@ pandas
 torch
 sentence-transformers
 
-# --- Deprecated prototype (search.py) ---
-faiss-cpu
-scikit-learn
-numpy
-dill
+# ── AWS backend (optional) ─────────────────────────────────
+boto3
+langchain-community
+psycopg2-binary
+pgvector

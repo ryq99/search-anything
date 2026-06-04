@@ -1,0 +1,13 @@
+class DynamoDBRegistry:
+    """Book ingestion ledger backed by DynamoDB (atomic conditional writes)."""
+
+    def __init__(self) -> None:
+        raise NotImplementedError(
+            "AWS backend not yet wired. "
+            "Set CLOUD_BACKEND=local or implement DynamoDBRegistry using boto3 DynamoDB."
+        )
+
+    def is_ingested(self, content_hash: str) -> bool: ...
+    def register(self, entry) -> None: ...
+    def get(self, content_hash: str) -> dict: ...
+    def load_all(self) -> dict: ...

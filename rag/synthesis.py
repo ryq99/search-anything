@@ -13,8 +13,8 @@ SYSTEM_PROMPT = (
     "Include the parent headings and headings from RETRIEVED RESULTS in parentheses after each bullet point. "
     "Provide clear, interview-level explanations with practical insights. "
     "Do not hallucinate references or invent headings; only use headings from the retrieved results. "
-    "Render math in LaTeX format where needed."
-    "Do not include extra text outside REQUIRED OUTPUT FORMAT."
+    "Render math in LaTeX format where needed. "
+    "Do not include extra text outside REQUIRED OUTPUT FORMAT. "
     "Cover theory and application in big-tech depth."
 )
 
@@ -31,26 +31,18 @@ OUTPUT_FORMAT_TEMPLATE = (
 
 def _build_user_message(question: str, retrieval_results_str: str) -> str:
     return (
-        f"{question}\n\n"
-        "QUESTION:\n"
-        f"{question}\n\n"
+        f"QUESTION:\n{question}\n\n"
         f"{OUTPUT_FORMAT_TEMPLATE}"
         f"RETRIEVED RESULTS:\n{retrieval_results_str}"
     )
 
 
 def ask(question: str, retrieval_results_str: str) -> str:
-    """Send question + retrieval context to Claude. Returns the answer string."""
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     message = client.messages.create(
         model=SYNTHESIS_MODEL,
         max_tokens=SYNTHESIS_MAX_TOKENS,
         system=SYSTEM_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": _build_user_message(question, retrieval_results_str),
-            }
-        ],
+        messages=[{"role": "user", "content": _build_user_message(question, retrieval_results_str)}],
     )
     return message.content[0].text
