@@ -2,7 +2,7 @@ import asyncio
 
 import anthropic
 
-from rag.config import ANTHROPIC_API_KEY, TOC_MODEL
+from rag.config import ANTHROPIC_API_KEY, LLM_MODEL
 
 
 class AnthropicLLM:
@@ -14,7 +14,7 @@ class AnthropicLLM:
 
     def complete(self, system: str, user: str, max_tokens: int) -> str:
         response = self._client.messages.create(
-            model=TOC_MODEL,
+            model=LLM_MODEL,
             max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],
@@ -25,7 +25,7 @@ class AnthropicLLM:
         for attempt in range(5):
             try:
                 response = await self._async_client.messages.create(
-                    model=TOC_MODEL,
+                    model=LLM_MODEL,
                     max_tokens=max_tokens,
                     system=system,
                     messages=[{"role": "user", "content": user}],

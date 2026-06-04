@@ -35,8 +35,7 @@ PARSER_ENABLE_IMAGE_DESCRIPTION = False
 CHUNK_MAX_TOKENS = 1024
 
 # --- Models ---
-TOC_MODEL            = "claude-haiku-4-5-20251001"
-SUMMARY_MODEL        = "claude-haiku-4-5-20251001"
+LLM_MODEL            = "claude-haiku-4-5-20251001"  # default for chunk/section summarization
 SYNTHESIS_MODEL      = os.getenv("SYNTHESIS_MODEL", "claude-haiku-4-5-20251001")
 SUMMARY_SEMAPHORE    = 5
 SUMMARY_MAX_TOKENS   = 1000
