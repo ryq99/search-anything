@@ -35,7 +35,7 @@ def start_watcher(books_dir: Path | None = None) -> None:
     import time
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler, FileCreatedEvent
-    from rag.parsers.router import SUPPORTED_EXTENSIONS
+    from rag.stages.parsing import SUPPORTED_EXTENSIONS
 
     books_dir = books_dir or BOOKS_DIR
     books_dir.mkdir(parents=True, exist_ok=True)

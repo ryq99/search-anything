@@ -1,3 +1,13 @@
+"""
+Parsing stage: the ingestion boundary of the pipeline.
+
+This is stage 0 — it turns an arbitrary source (PDF, DOCX, plaintext, and later
+web/youtube) into normalized markdown. It owns *orchestration*: content-type
+detection and selecting which concrete parser from `rag.parsers` to run. The
+parsers themselves are a pluggable family that lives in `rag/parsers/`; this
+stage decides which one to call.
+"""
+import hashlib
 from pathlib import Path
 
 from rag.core.schemas import ParseResult
@@ -27,12 +37,12 @@ def detect_content_type(source: Path | str) -> str:
         return "web"
     ext = Path(source).suffix.lower()
     return {
-        ".pdf":  "pdf",
-        ".docx": "docx",
-        ".pptx": "pptx",
+        ".pdf":   "pdf",
+        ".docx":  "docx",
+        ".pptx":  "pptx",
         ".ipynb": "notebook",
-        ".md":   "markdown",
-        ".txt":  "text",
+        ".md":    "markdown",
+        ".txt":   "text",
     }.get(ext, "unknown")
 
 
@@ -54,7 +64,6 @@ def parse_to_markdown(source: Path | str) -> ParseResult:
 
 
 def _parse_plaintext(source: Path | str) -> ParseResult:
-    import hashlib
     source = Path(source)
     content = source.read_text(encoding="utf-8")
     content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
