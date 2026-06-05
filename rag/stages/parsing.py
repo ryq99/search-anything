@@ -2,10 +2,15 @@
 Parsing stage: the ingestion boundary of the pipeline.
 
 This is stage 0 — it turns an arbitrary source (PDF, DOCX, plaintext, and later
-web/youtube) into normalized markdown. It owns *orchestration*: content-type
-detection and selecting which concrete parser from `rag.parsers` to run. The
-parsers themselves are a pluggable family that lives in `rag/parsers/`; this
-stage decides which one to call.
+web/youtube) into a ParseResult. For docling, the *primary* output is a
+structured DoclingDocument (the parsed semantic tree that chunking consumes);
+markdown is emitted alongside it as a secondary, human-readable audit artifact.
+For liteparse/plaintext, only markdown is available.
+
+This stage owns *orchestration*: content-type detection and selecting which
+concrete parser from `rag.parsers` to run. The parsers themselves are a
+pluggable family that lives in `rag/parsers/`; this stage decides which one
+to call.
 """
 import hashlib
 from pathlib import Path
@@ -46,8 +51,15 @@ def detect_content_type(source: Path | str) -> str:
     }.get(ext, "unknown")
 
 
-def parse_to_markdown(source: Path | str) -> ParseResult:
-    """Detect content type and route to the appropriate parser."""
+def parse_document(source: Path | str) -> ParseResult:
+    """
+    Detect content type and route to the appropriate parser.
+
+    Returns a ParseResult carrying the structured DoclingDocument (when docling
+    is used) plus markdown. Despite living in the "parsing" stage, the real
+    output for the docling path is the DoclingDocument tree, not the markdown —
+    markdown is a side artifact.
+    """
     content_type = detect_content_type(source)
 
     if content_type in ("pdf", "docx", "pptx"):
@@ -68,7 +80,7 @@ def _parse_plaintext(source: Path | str) -> ParseResult:
     content = source.read_text(encoding="utf-8")
     content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
     return ParseResult(
-        content=content,
+        markdown=content,
         content_hash=content_hash,
         source_path=str(source),
         content_type="text",

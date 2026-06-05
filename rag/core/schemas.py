@@ -4,11 +4,14 @@ from typing import Any
 
 @dataclass
 class ParseResult:
-    content: str        # markdown text (audit artifact + liteparse chunking input)
+    # Secondary, human-readable serialization. Audit artifact + the chunking
+    # input for parsers that produce no DoclingDocument (liteparse/plaintext).
+    markdown: str
     content_hash: str   # hex string (from docling or SHA-256)
     source_path: str    # original file path or URL
     content_type: str   # "pdf", "docx", "web", "notebook", etc.
-    # Populated by DoclingParser; None for liteparse/plaintext paths.
+    # PRIMARY output for the docling path: the structured semantic tree that
+    # chunking consumes directly. None for liteparse/plaintext paths.
     # Typed as Any so core/ stays free of heavy docling imports.
     docling_document: Any = None
 

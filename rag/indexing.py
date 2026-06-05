@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
-from rag.stages.parsing import parse_to_markdown, SUPPORTED_EXTENSIONS
+from rag.stages.parsing import parse_document, SUPPORTED_EXTENSIONS
 from rag.stages import chunking as chunking_stage
 from rag.stages import summarize as summarize_stage
 from rag.backends.factory import get_backend
@@ -20,7 +20,7 @@ def ingest_source(source: Path | str) -> dict:
     source = Path(source)
 
     print(f"[pipeline] Parsing {source.name}...")
-    parse_result = parse_to_markdown(source)
+    parse_result = parse_document(source)
 
     if backend.registry.is_ingested(parse_result.content_hash):
         print(f"[pipeline] Already ingested: {source.name} (hash={parse_result.content_hash[:10]}...)")

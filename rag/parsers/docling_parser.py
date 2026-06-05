@@ -84,7 +84,7 @@ class DoclingParser:
         print(f"[parser:docling] Saved markdown: {out_file}")
 
         return ParseResult(
-            content=md_text,
+            markdown=md_text,
             content_hash=_content_hash(result.document, source),
             source_path=str(source),
             content_type=source.suffix.lower().lstrip("."),
