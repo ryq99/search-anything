@@ -1,5 +1,5 @@
 """
-Chunking stage: splits a parsed document into embeddable chunks and enriches
+Chunking step: splits a parsed document into embeddable chunks and enriches
 each with heading ancestry.
 
 Orchestration only — selects the configured chunker from rag.chunkers and

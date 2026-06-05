@@ -2,9 +2,9 @@ import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
-from rag.stages.parsing import parse_document, SUPPORTED_EXTENSIONS
-from rag.stages import chunking as chunking_stage
-from rag.stages import summarize as summarize_stage
+from rag.steps.parsing import parse_document, SUPPORTED_EXTENSIONS
+from rag.steps import chunking as chunking_step
+from rag.steps import summarize as summarize_step
 from rag.backends.factory import get_backend
 from rag.core.schemas import BookEntry
 from rag.config import BOOKS_DIR
@@ -29,11 +29,11 @@ def ingest_source(source: Path | str) -> dict:
     stem = _stem(parse_result.source_path)
 
     print("[pipeline] Chunking and enriching...")
-    chunks, parent_headings_text = chunking_stage.chunk_and_enrich(parse_result)
+    chunks, parent_headings_text = chunking_step.chunk_and_enrich(parse_result)
 
     print(f"[pipeline] Summarizing {len(parent_headings_text)} parent heading groups...")
-    summaries = asyncio.run(summarize_stage.summarize_all(parent_headings_text, backend.llm))
-    summary_path = summarize_stage.save_summaries_csv(summaries, stem)
+    summaries = asyncio.run(summarize_step.summarize_all(parent_headings_text, backend.llm))
+    summary_path = summarize_step.save_summaries_csv(summaries, stem)
 
     print(f"[pipeline] Embedding and storing {len(chunks)} chunks...")
     backend.vectorstore.store(chunks)
