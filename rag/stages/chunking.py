@@ -3,8 +3,8 @@ Chunking stage: splits parsed markdown into embeddable chunks and enriches
 each chunk with its heading ancestry.
 
 This stage owns orchestration — selecting which concrete chunker from
-rag.chunker to run based on config. The chunkers themselves live in
-rag/chunker/; adding a new strategy means dropping a file there and adding
+rag.chunkers to run based on config. The chunkers themselves live in
+rag/chunkers/; adding a new strategy means dropping a file there and adding
 one dispatch line here.
 """
 from pathlib import Path
@@ -17,9 +17,9 @@ from rag.config import LOCAL_CHUNKER
 def _get_chunker():
     """Select the chunker based on the LOCAL_CHUNKER config flag."""
     if LOCAL_CHUNKER == "docling":
-        from rag.chunker.docling_chunker import DoclingChunker
+        from rag.chunkers.docling_chunker import DoclingChunker
         return DoclingChunker()
-    from rag.chunker.docling_chunker import DoclingChunker
+    from rag.chunkers.docling_chunker import DoclingChunker
     return DoclingChunker()
 
 
