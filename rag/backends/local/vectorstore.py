@@ -4,6 +4,7 @@ from langchain_core.documents import Document
 from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_milvus import Milvus
 
+from rag.core.schemas import Chunk
 from rag.config import EMBED_MODEL_ID, VECTOR_STORE_NAME, MILVUS_URI, VECTOR_STORE_DIR
 
 
@@ -17,13 +18,13 @@ class MilvusVectorStore:
             model_kwargs={"trust_remote_code": True},
         )
 
-    def store(self, docs: list[Document]) -> None:
-        """Embed and persist documents. Converts content_hash to int64 for Milvus schema."""
-        adapted = self._adapt_metadata(docs)
+    def store(self, chunks: list[Chunk]) -> None:
+        """Embed and persist chunks. Converts Chunk -> langchain Document at this boundary."""
+        docs = self._to_documents(chunks)
         if not Path(MILVUS_URI).exists():
             print("[vectorstore] Creating new Milvus collection...")
             Milvus.from_documents(
-                documents=adapted,
+                documents=docs,
                 embedding=self._embedding,
                 collection_name=VECTOR_STORE_NAME,
                 connection_args={"uri": MILVUS_URI},
@@ -31,8 +32,7 @@ class MilvusVectorStore:
             )
         else:
             print("[vectorstore] Adding to existing Milvus collection...")
-            vs = self._connect()
-            vs.add_documents(adapted)
+            self._connect().add_documents(docs)
 
     def get_store(self) -> Milvus:
         return self._connect()
@@ -46,12 +46,26 @@ class MilvusVectorStore:
         )
 
     @staticmethod
-    def _adapt_metadata(docs: list[Document]) -> list[Document]:
-        # Milvus schema uses int64 for the hash field; convert hex string here
-        adapted = []
-        for doc in docs:
-            meta = dict(doc.metadata)
-            hash_str = meta.pop("content_hash", "0x0")
-            meta["binary_hash"] = int(hash_str, 16) % (2 ** 63)
-            adapted.append(Document(page_content=doc.page_content, metadata=meta))
-        return adapted
+    def _to_documents(chunks: list[Chunk]) -> list[Document]:
+        """
+        Convert Chunk objects to langchain Documents for Milvus.
+
+        - page_content uses enriched_text (heading-prefixed) so the embedding
+          captures section context, improving retrieval on section-level queries.
+        - content_hash is converted to int64 (binary_hash) to satisfy Milvus's
+          schema requirement; the original hex string is preserved in metadata.
+        - headings and parent_headings are stored as strings for metadata filtering.
+        """
+        docs = []
+        for chunk in chunks:
+            docs.append(Document(
+                page_content=chunk.enriched_text,
+                metadata={
+                    "binary_hash": int(chunk.content_hash, 16) % (2 ** 63),
+                    "filename": chunk.filename,
+                    "headings": chunk.headings,
+                    "parent_headings": chunk.parent_headings,
+                    "text": chunk.text,  # raw text preserved for display
+                },
+            ))
+        return docs

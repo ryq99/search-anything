@@ -2,13 +2,12 @@ import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
-from rag.parsers.router import parse_to_markdown, SUPPORTED_EXTENSIONS
-from rag.stages import toc as toc_stage
+from rag.stages.parsing import parse_document, SUPPORTED_EXTENSIONS
 from rag.stages import chunking as chunking_stage
 from rag.stages import summarize as summarize_stage
 from rag.backends.factory import get_backend
-from rag.core.models import BookEntry
-from rag.config import DATA_DIR, BOOKS_DIR
+from rag.core.schemas import BookEntry
+from rag.config import BOOKS_DIR
 
 
 def _stem(source_path: str) -> str:
@@ -21,22 +20,16 @@ def ingest_source(source: Path | str) -> dict:
     source = Path(source)
 
     print(f"[pipeline] Parsing {source.name}...")
-    parse_result = parse_to_markdown(source)
+    parse_result = parse_document(source)
 
     if backend.registry.is_ingested(parse_result.content_hash):
         print(f"[pipeline] Already ingested: {source.name} (hash={parse_result.content_hash[:10]}...)")
         return backend.registry.get(parse_result.content_hash)
 
     stem = _stem(parse_result.source_path)
-    md_path = DATA_DIR / f"{stem}_converted.md"
-
-    print("[pipeline] Extracting TOC...")
-    toc_df = toc_stage.extract_toc(parse_result.content, stem, backend.llm)
 
     print("[pipeline] Chunking and enriching...")
-    chunks, parent_headings_text = chunking_stage.chunk_and_enrich(
-        md_path, toc_df, parse_result.content_hash, source.name
-    )
+    chunks, parent_headings_text = chunking_stage.chunk_and_enrich(parse_result)
 
     print(f"[pipeline] Summarizing {len(parent_headings_text)} parent heading groups...")
     summaries = asyncio.run(summarize_stage.summarize_all(parent_headings_text, backend.llm))
@@ -51,7 +44,6 @@ def ingest_source(source: Path | str) -> dict:
         content_hash=parse_result.content_hash,
         ingested_at=datetime.now(timezone.utc).isoformat(),
         chunk_count=len(chunks),
-        toc_artifact_path=str(DATA_DIR / f"{stem}_toc.csv"),
         summary_artifact_path=str(summary_path),
     )
     backend.registry.register(entry)
