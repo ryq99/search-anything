@@ -63,7 +63,7 @@ class LiteParseParser:
         content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
 
         return ParseResult(
-            content=md_text,
+            markdown=md_text,
             content_hash=content_hash,
             source_path=str(source),
             content_type=source.suffix.lower().lstrip("."),
