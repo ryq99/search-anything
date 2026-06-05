@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rag.pipeline import ingest_source, ingest_directory
+from rag.indexing import ingest_source, ingest_directory
 from rag.retrieval import retrieve, format_retrieval_results, _load_summaries_for_books
 from rag.synthesis import ask as _synthesize
 from rag.backends.factory import get_backend
