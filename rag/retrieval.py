@@ -32,7 +32,7 @@ def retrieve(
 ) -> list[dict]:
     """
     Run similarity search and enrich each result with its pre-computed summary.
-    Returns a list of dicts with rank, headings, parent_headings, child_headings,
+    Returns a list of dicts with rank, headings, parent_headings,
     summary, and page_content.
     """
     if vectorstore is None:
@@ -60,9 +60,8 @@ def retrieve(
             "rank": i + 1,
             "headings": doc.metadata.get("headings", ""),
             "parent_headings": parent_headings,
-            "child_headings": doc.metadata.get("child_headings", ""),
             "summary": summary,
-            "page_content": doc.page_content,
+            "page_content": doc.metadata.get("text") or doc.page_content,
         })
 
     return chunks

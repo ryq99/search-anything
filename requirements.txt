@@ -11,6 +11,8 @@ watchdog
 pandas
 torch
 sentence-transformers
+easyocr            # OCR engine for docling (scanned/mixed PDFs)
+liteparse          # alternative local parser (native Rust core, built-in OCR)
 
 # ── AWS backend (optional) ─────────────────────────────────
 boto3

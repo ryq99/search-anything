@@ -1,6 +1,6 @@
 import json
 
-from rag.core.models import BookEntry
+from rag.core.schemas import BookEntry
 from rag.config import PROCESSED_BOOKS_PATH
 
 

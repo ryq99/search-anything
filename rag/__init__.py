@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rag.pipeline import ingest_source, ingest_directory
+from rag.indexing import ingest_source, ingest_directory
 from rag.retrieval import retrieve, format_retrieval_results, _load_summaries_for_books
 from rag.synthesis import ask as _synthesize
 from rag.backends.factory import get_backend
@@ -35,7 +35,7 @@ def start_watcher(books_dir: Path | None = None) -> None:
     import time
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler, FileCreatedEvent
-    from rag.parsers.router import SUPPORTED_EXTENSIONS
+    from rag.stages.parsing import SUPPORTED_EXTENSIONS
 
     books_dir = books_dir or BOOKS_DIR
     books_dir.mkdir(parents=True, exist_ok=True)
