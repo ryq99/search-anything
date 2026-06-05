@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
-from rag.parsers.router import parse_to_markdown, SUPPORTED_EXTENSIONS
+from rag.stages.parsing import parse_to_markdown, SUPPORTED_EXTENSIONS
 from rag.stages import toc as toc_stage
 from rag.stages import chunking as chunking_stage
 from rag.stages import summarize as summarize_stage
