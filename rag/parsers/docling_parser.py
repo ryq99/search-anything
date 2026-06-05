@@ -88,6 +88,7 @@ class DoclingParser:
             content_hash=_content_hash(result.document, source),
             source_path=str(source),
             content_type=source.suffix.lower().lstrip("."),
+            docling_document=result.document,
         )
 
 
