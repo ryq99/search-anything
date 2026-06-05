@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from rag import ask, ingest_books, ingest_source, start_watcher
+from rag.api import ask, ingest_books, ingest_source, start_watcher
 from rag.config import BOOKS_DIR
 
 

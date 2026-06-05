@@ -39,6 +39,7 @@ search-anything = "rag.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+namespaces = true
 
 [tool.setuptools.package-dir]
 "" = "src"
