@@ -9,5 +9,6 @@ __pycache__/
 **/*.db
 **/*.ipynb
 .env*
+!.env.example
 .DS_Store
 books/
