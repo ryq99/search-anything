@@ -1,12 +1,22 @@
 from pathlib import Path
 
 from rag.core.schemas import ParseResult
+from rag.config import LOCAL_PARSER
 
-# Extensions handled by each parser family
-_DOCLING_EXTENSIONS = {".pdf", ".docx", ".pptx"}
+# Extensions handled by the document parser family (docling / liteparse)
+_DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".pptx"}
 _PASSTHROUGH_EXTENSIONS = {".md", ".txt"}
 
-SUPPORTED_EXTENSIONS = _DOCLING_EXTENSIONS | _PASSTHROUGH_EXTENSIONS
+SUPPORTED_EXTENSIONS = _DOCUMENT_EXTENSIONS | _PASSTHROUGH_EXTENSIONS
+
+
+def _get_document_parser():
+    """Select the local document parser based on the LOCAL_PARSER config flag."""
+    if LOCAL_PARSER == "liteparse":
+        from rag.parsers.liteparse_parser import LiteParseParser
+        return LiteParseParser()
+    from rag.parsers.docling_parser import DoclingParser
+    return DoclingParser()
 
 
 def detect_content_type(source: Path | str) -> str:
@@ -31,8 +41,7 @@ def parse_to_markdown(source: Path | str) -> ParseResult:
     content_type = detect_content_type(source)
 
     if content_type in ("pdf", "docx", "pptx"):
-        from rag.parsers.docling_parser import DoclingParser
-        return DoclingParser().parse(source)
+        return _get_document_parser().parse(source)
 
     if content_type in ("markdown", "text"):
         return _parse_plaintext(source)
