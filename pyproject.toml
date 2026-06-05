@@ -34,9 +34,19 @@ aws = [
     "boto3",
 ]
 
+[project.scripts]
+search-anything = "main:main"
+
+[tool.setuptools]
+# main.py lives at the repo root (outside src/) as a top-level module so it can
+# back the console script while staying the `python main.py` entry point too.
+py-modules = ["main"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 namespaces = true
 
+# Map only the rag package into src/ (not the whole root namespace), leaving the
+# root free for the top-level main module above.
 [tool.setuptools.package-dir]
-"" = "src"
+rag = "src/rag"
