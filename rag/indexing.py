@@ -7,7 +7,7 @@ from rag.stages import chunking as chunking_stage
 from rag.stages import summarize as summarize_stage
 from rag.backends.factory import get_backend
 from rag.core.schemas import BookEntry
-from rag.config import DATA_DIR, BOOKS_DIR
+from rag.config import BOOKS_DIR
 
 
 def _stem(source_path: str) -> str:
@@ -27,12 +27,9 @@ def ingest_source(source: Path | str) -> dict:
         return backend.registry.get(parse_result.content_hash)
 
     stem = _stem(parse_result.source_path)
-    md_path = DATA_DIR / f"{stem}_converted.md"
 
     print("[pipeline] Chunking and enriching...")
-    chunks, parent_headings_text = chunking_stage.chunk_and_enrich(
-        md_path, parse_result.content_hash, source.name
-    )
+    chunks, parent_headings_text = chunking_stage.chunk_and_enrich(parse_result)
 
     print(f"[pipeline] Summarizing {len(parent_headings_text)} parent heading groups...")
     summaries = asyncio.run(summarize_stage.summarize_all(parent_headings_text, backend.llm))

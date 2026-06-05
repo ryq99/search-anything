@@ -61,7 +61,7 @@ def retrieve(
             "headings": doc.metadata.get("headings", ""),
             "parent_headings": parent_headings,
             "summary": summary,
-            "page_content": doc.page_content,
+            "page_content": doc.metadata.get("text") or doc.page_content,
         })
 
     return chunks
