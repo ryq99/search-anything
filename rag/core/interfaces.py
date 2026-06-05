@@ -1,7 +1,7 @@
 from typing import Protocol, runtime_checkable
 from pathlib import Path
 
-from rag.core.models import ParseResult, BookEntry
+from rag.core.data_schemas import ParseResult, BookEntry
 
 
 @runtime_checkable

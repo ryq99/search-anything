@@ -7,7 +7,7 @@ from rag.stages import toc as toc_stage
 from rag.stages import chunking as chunking_stage
 from rag.stages import summarize as summarize_stage
 from rag.backends.factory import get_backend
-from rag.core.models import BookEntry
+from rag.core.data_schemas import BookEntry
 from rag.config import DATA_DIR, BOOKS_DIR
 
 
