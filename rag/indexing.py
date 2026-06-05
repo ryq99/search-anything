@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from rag.stages.parsing import parse_to_markdown, SUPPORTED_EXTENSIONS
-from rag.stages import toc as toc_stage
 from rag.stages import chunking as chunking_stage
 from rag.stages import summarize as summarize_stage
 from rag.backends.factory import get_backend
@@ -30,12 +29,9 @@ def ingest_source(source: Path | str) -> dict:
     stem = _stem(parse_result.source_path)
     md_path = DATA_DIR / f"{stem}_converted.md"
 
-    print("[pipeline] Extracting TOC...")
-    toc_df = toc_stage.extract_toc(parse_result.content, stem, backend.llm)
-
     print("[pipeline] Chunking and enriching...")
     chunks, parent_headings_text = chunking_stage.chunk_and_enrich(
-        md_path, toc_df, parse_result.content_hash, source.name
+        md_path, parse_result.content_hash, source.name
     )
 
     print(f"[pipeline] Summarizing {len(parent_headings_text)} parent heading groups...")
@@ -51,7 +47,6 @@ def ingest_source(source: Path | str) -> dict:
         content_hash=parse_result.content_hash,
         ingested_at=datetime.now(timezone.utc).isoformat(),
         chunk_count=len(chunks),
-        toc_artifact_path=str(DATA_DIR / f"{stem}_toc.csv"),
         summary_artifact_path=str(summary_path),
     )
     backend.registry.register(entry)

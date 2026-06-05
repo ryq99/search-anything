@@ -16,7 +16,6 @@ class BookEntry:
     content_hash: str
     ingested_at: str
     chunk_count: int
-    toc_artifact_path: str = ""
     summary_artifact_path: str = ""
 
     def to_dict(self) -> dict:
@@ -26,6 +25,5 @@ class BookEntry:
             "content_hash": self.content_hash,
             "ingested_at": self.ingested_at,
             "chunk_count": self.chunk_count,
-            "toc_artifact_path": self.toc_artifact_path,
             "summary_artifact_path": self.summary_artifact_path,
         }
