@@ -32,6 +32,7 @@ PARSER_MIN_CONTENT_LENGTH = 500
 PARSER_ENABLE_IMAGE_DESCRIPTION = False
 
 # --- Chunking ---
+LOCAL_CHUNKER    = os.getenv("LOCAL_CHUNKER", "docling")  # "docling" | future strategies
 CHUNK_MAX_TOKENS = 1024
 
 # --- Models ---
