@@ -3,7 +3,7 @@ from pathlib import Path
 
 from docling.document_converter import DocumentConverter
 
-from rag.core.data_schemas import ParseResult
+from rag.core.schemas import ParseResult
 from rag.config import DATA_DIR
 
 _MIN_CONTENT_LENGTH = 500  # chars; below this likely means a scanned/empty PDF
