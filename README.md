@@ -29,44 +29,67 @@ cp .env.example .env
 
 ## Workflow
 
-Indexing converts source files into searchable vector chunks. Each file goes through four stages:
+Indexing
 
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
-flowchart TD
-    A("Source file\nPDF / DOCX / PPTX / MD / TXT") --> B
+flowchart LR
+    A("Source file
+    PDF / DOCX / PPTX / MD / TXT")
 
     subgraph B["1. Parse"]
-        B1("docling (default)\nML layout model → DoclingDocument\npreserves headings, tables, reading order")
-        B2("liteparse (LOCAL_PARSER=liteparse)\nfast Rust core + Tesseract OCR\noutputs markdown")
-        B3("plain text / MD\npassthrough")
+        direction TB
+        B1("docling
+        ML layout model
+        DoclingDocument")
+        B2("liteparse
+        fast Rust + OCR
+        outputs markdown")
+        B3("plain text / MD
+        passthrough")
     end
 
-    B --> C("ParseResult\nmarkdown + SHA-256 content hash\n+ DoclingDocument (docling path)")
-
-    C --> D
+    C("ParseResult
+    SHA-256 content hash")
 
     subgraph D["2. Chunk + Enrich"]
-        D1("HierarchicalChunker\nsplit on headings & lists")
-        D2("Token-aware split\nbreak chunks > CHUNK_MAX_TOKENS")
-        D3("merge_peers\nmerge undersized same-heading neighbours")
+        direction TB
+        D1("HierarchicalChunker
+        split on headings & lists")
+        D2("Token-aware split
+        max CHUNK_MAX_TOKENS")
+        D3("merge_peers
+        merge undersized neighbours")
         D1 --> D2 --> D3
     end
 
-    D --> E("Chunk objects\ntext + enriched_text (heading-prefixed) + metadata\nparent_headings, headings derived from document tree")
+    E("Chunk objects
+    text + enriched_text + metadata")
 
-    E --> F("3. Section Summarization\nClaude summarizes each parent-heading group\nconcurrently (semaphore=5)\n→ summaries CSV in data/")
+    F("3. Section Summarization
+    Claude summarizes per heading group
+    concurrently — summaries CSV")
 
-    F --> G("4. Embed + Store\nSnowflake Arctic Embed L v2.0\nembeds enriched_text of each chunk")
+    G("4. Embed + Store
+    Snowflake Arctic Embed L v2.0")
 
-    G --> H1("Milvus Lite\n(local)")
-    G --> H2("Bedrock Knowledge Base\n(AWS)")
+    H1("Milvus Lite
+    local")
+    H2("Bedrock KB
+    AWS")
+    I1("processed_books.json
+    local registry")
+    I2("DynamoDB
+    AWS registry")
 
-    F --> I1("processed_books.json\n(local registry)")
-    F --> I2("DynamoDB\n(AWS registry)")
+    A --> B --> C --> D --> E --> F --> G
+    G --> H1
+    G --> H2
+    F --> I1
+    F --> I2
 ```
 
-### Ingest commands
+### Commands
 
 ```bash
 # Ingest all new files in books/
