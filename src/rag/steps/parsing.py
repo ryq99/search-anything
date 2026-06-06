@@ -1,15 +1,15 @@
 """
-Parsing stage: the ingestion boundary of the pipeline.
+Parsing step: the ingestion boundary of the pipeline.
 
-This is stage 0 — it turns an arbitrary source (PDF, DOCX, plaintext, and later
+This is step 0 — it turns an arbitrary source (PDF, DOCX, plaintext, and later
 web/youtube) into a ParseResult. For docling, the *primary* output is a
 structured DoclingDocument (the parsed semantic tree that chunking consumes);
 markdown is emitted alongside it as a secondary, human-readable audit artifact.
 For liteparse/plaintext, only markdown is available.
 
-This stage owns *orchestration*: content-type detection and selecting which
+This step owns *orchestration*: content-type detection and selecting which
 concrete parser from `rag.parsers` to run. The parsers themselves are a
-pluggable family that lives in `rag/parsers/`; this stage decides which one
+pluggable family that lives in `rag/parsers/`; this step decides which one
 to call.
 """
 import hashlib
@@ -56,7 +56,7 @@ def parse_document(source: Path | str) -> ParseResult:
     Detect content type and route to the appropriate parser.
 
     Returns a ParseResult carrying the structured DoclingDocument (when docling
-    is used) plus markdown. Despite living in the "parsing" stage, the real
+    is used) plus markdown. Despite living in the "parsing" step, the real
     output for the docling path is the DoclingDocument tree, not the markdown —
     markdown is a side artifact.
     """

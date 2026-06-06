@@ -1,7 +1,8 @@
 import argparse
 from pathlib import Path
 
-from rag import ask, ingest_books, ingest_source, start_watcher
+from rag.retrieval import ask
+from rag.indexing import ingest_source, ingest_directory, start_watcher
 from rag.config import BOOKS_DIR
 
 
@@ -41,7 +42,7 @@ def main():
         if args.paths:
             results = [ingest_source(p) for p in args.paths]
         else:
-            results = ingest_books(BOOKS_DIR)
+            results = ingest_directory(BOOKS_DIR)
         if results:
             print(f"\nIngested {len(results)} new file(s):")
             for r in results:

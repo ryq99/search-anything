@@ -3,7 +3,12 @@ from pathlib import Path
 from docling.chunking import HybridChunker
 
 from rag.core.schemas import Chunk, ParseResult
-from rag.config import EMBED_MODEL_ID, CHUNK_MAX_TOKENS
+from rag.config import (
+    CHUNK_TOKENIZER,
+    CHUNK_MAX_TOKENS,
+    CHUNK_MERGE_PEERS,
+    CHUNK_MERGE_LIST_ITEMS,
+)
 
 
 class DoclingChunker:
@@ -24,10 +29,25 @@ class DoclingChunker:
     """
 
     def __init__(self) -> None:
+        # HybridChunker runs a 3-pass pipeline:
+        #   1. HierarchicalChunker  — split on document structure (headings, lists)
+        #   2. token-aware split    — break any chunk exceeding max_tokens
+        #   3. merge_peers          — recombine undersized same-heading neighbours
+        # All knobs are sourced from config so they can be tuned via .env.
         self._chunker = HybridChunker(
-            tokenizer=EMBED_MODEL_ID,
+            tokenizer=CHUNK_TOKENIZER,
             max_tokens=CHUNK_MAX_TOKENS,
+            merge_peers=CHUNK_MERGE_PEERS,
         )
+        # merge_list_items belongs to the inner hierarchical (1st) pass, which
+        # HybridChunker constructs internally. Apply it there when supported so
+        # the behaviour stays configurable across docling versions.
+        inner = getattr(self._chunker, "_inner_chunker", None)
+        if inner is not None and hasattr(inner, "merge_list_items"):
+            try:
+                inner.merge_list_items = CHUNK_MERGE_LIST_ITEMS
+            except (AttributeError, ValueError):
+                pass  # frozen model on some versions; default (True) stands
 
     def chunk(self, parse_result: ParseResult) -> tuple[list[Chunk], dict[str, str]]:
         """

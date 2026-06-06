@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from rag.config import RETRIEVAL_K, RETRIEVAL_EXPR
+from rag.synthesis import ask as _synthesize
 
 
 def _get_vectorstore():
@@ -77,3 +78,14 @@ def format_retrieval_results(chunks: list[dict]) -> str:
             f"Page Content:\n    {c['page_content']}\n"
         )
     return "\n".join(parts)
+
+
+def ask(question: str) -> str:
+    """Retrieve relevant chunks and synthesize an answer."""
+    from rag.backends.factory import get_backend
+    backend = get_backend()
+    registry = backend.registry.load_all()
+    summaries_df = _load_summaries_for_books(registry)
+    vs = backend.vectorstore.get_store()
+    chunks = retrieve(question, vectorstore=vs, summaries_df=summaries_df)
+    return _synthesize(question, format_retrieval_results(chunks))

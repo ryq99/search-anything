@@ -1,21 +1,7 @@
-# ── RAG pipeline ───────────────────────────────────────────
-docling
-langchain-docling
-langchain-core
-langchain-huggingface
-langchain-milvus
-pymilvus
-anthropic
-python-dotenv
-watchdog
-pandas
-torch
-sentence-transformers
-easyocr            # OCR engine for docling (scanned/mixed PDFs)
-liteparse          # alternative local parser (native Rust core, built-in OCR)
-
-# ── AWS backend (optional) ─────────────────────────────────
-boto3
-langchain-community
-psycopg2-binary
-pgvector
+# Dependencies are declared in pyproject.toml (single source of truth).
+# Install the package in editable mode:
+#
+#   pip install -e .          # core (local backend)
+#   pip install -e ".[aws]"   # + AWS backend (S3 + DynamoDB + Bedrock)
+#
+-e .
