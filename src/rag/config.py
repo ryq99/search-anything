@@ -8,7 +8,9 @@ load_dotenv()
 CLOUD_BACKEND = os.getenv("CLOUD_BACKEND", "local")  # "local" | "aws"
 
 # --- Paths (local mode) ---
-PROJECT_ROOT         = Path(__file__).parent.parent
+# config.py lives at src/rag/config.py, so three .parent hops reach the repo root
+# (config.py -> rag -> src -> repo root) where books/, data/, vector_store/ live.
+PROJECT_ROOT         = Path(__file__).parent.parent.parent
 BOOKS_DIR            = PROJECT_ROOT / "books"
 DATA_DIR             = PROJECT_ROOT / "data"
 VECTOR_STORE_DIR     = PROJECT_ROOT / "vector_store"
@@ -33,7 +35,18 @@ PARSER_ENABLE_IMAGE_DESCRIPTION = False
 
 # --- Chunking ---
 LOCAL_CHUNKER    = os.getenv("LOCAL_CHUNKER", "docling")  # "docling" | future strategies
-CHUNK_MAX_TOKENS = 1024
+# Tokenizer that drives token counting + the model's max sequence length. Keep
+# this equal to the embedding model so chunk sizes match what actually gets embedded.
+CHUNK_TOKENIZER  = os.getenv("CHUNK_TOKENIZER", EMBED_MODEL_ID)
+# Hard ceiling on tokens per chunk (the token-aware split pass). Oversized
+# doc-items get split until each piece fits under this limit.
+CHUNK_MAX_TOKENS = int(os.getenv("CHUNK_MAX_TOKENS", "1024"))
+# Merge undersized adjacent chunks that share the same heading path (3rd pass).
+# True = fewer, denser chunks; False = preserve original doc-item boundaries.
+CHUNK_MERGE_PEERS = os.getenv("CHUNK_MERGE_PEERS", "true").lower() == "true"
+# Collapse consecutive list items into a single chunk (hierarchical 1st pass).
+# True = a bullet list stays together; False = each item is its own chunk.
+CHUNK_MERGE_LIST_ITEMS = os.getenv("CHUNK_MERGE_LIST_ITEMS", "true").lower() == "true"
 
 # --- Models ---
 LLM_MODEL            = "claude-haiku-4-5-20251001"  # default for chunk/section summarization
