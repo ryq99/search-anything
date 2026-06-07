@@ -16,9 +16,11 @@ RAG for personal knowledge base.
 ## Setup
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 
-pip install -e .
+pip install -e .          # local backend
+pip install -e ".[aws]"   # + AWS backend (S3 + DynamoDB + Bedrock)
 ```
 
 Copy `.env.example` to `.env` and fill in your keys:
@@ -113,9 +115,9 @@ All tunables are in [src/rag/config.py](src/rag/config.py) and overridable via `
 | Variable | Default | Description |
 |---|---|---|
 | `CLOUD_BACKEND` | `local` | `local` or `aws` |
-| `LOCAL_PARSER` | `docling` | `docling` (ML layout) or `liteparse` (fast Rust + OCR) |
-| `PARSER_ENABLE_OCR` | `true` | OCR on scanned/mixed pages (docling path) |
-| `LOCAL_CHUNKER` | `docling` | Chunker strategy (currently `docling` only) |
+| `LOCAL_PARSER` | `liteparse` | `liteparse` (fast Rust + OCR) or `docling` (ML layout) |
+| `PARSER_ENABLE_OCR` | `true` | OCR on scanned/mixed pages |
+| `LOCAL_CHUNKER` | `liteparse` | `liteparse` (markdown-native) or `docling` (structure-native) |
 | `CHUNK_MAX_TOKENS` | `1024` | Hard token ceiling per chunk |
 | `CHUNK_MERGE_PEERS` | `true` | Merge undersized same-heading neighbours |
 | `CHUNK_MERGE_LIST_ITEMS` | `true` | Collapse consecutive list items into one chunk |
