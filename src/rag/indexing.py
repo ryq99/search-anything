@@ -10,10 +10,6 @@ from rag.core.schemas import BookEntry
 from rag.config import BOOKS_DIR
 
 
-def _stem(source_path: str) -> str:
-    return Path(source_path).stem.replace(" ", "_").replace("-", "_").lower()
-
-
 def ingest_source(source: Path | str) -> dict:
     """Full ingestion pipeline for a single source. Idempotent."""
     backend = get_backend()
@@ -26,14 +22,12 @@ def ingest_source(source: Path | str) -> dict:
         print(f"[pipeline] Already ingested: {source.name} (hash={parse_result.content_hash[:10]}...)")
         return backend.registry.get(parse_result.content_hash)
 
-    stem = _stem(parse_result.source_path)
-
     print("[pipeline] Chunking and enriching...")
     chunks, parent_headings_text = chunking_step.chunk_and_enrich(parse_result)
 
     print(f"[pipeline] Summarizing {len(parent_headings_text)} parent heading groups...")
     summaries = asyncio.run(summarize_step.summarize_all(parent_headings_text, backend.llm))
-    summary_path = summarize_step.save_summaries_csv(summaries, stem)
+    summary_path = summarize_step.save_summaries_csv(summaries, parse_result.doc_dir)
 
     print(f"[pipeline] Embedding and storing {len(chunks)} chunks...")
     backend.vectorstore.store(chunks)

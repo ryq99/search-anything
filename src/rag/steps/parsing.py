@@ -13,10 +13,11 @@ pluggable family that lives in `rag/parsers/`; this step decides which one
 to call.
 """
 import hashlib
+import json
 from pathlib import Path
 
 from rag.core.schemas import ParseResult
-from rag.config import LOCAL_PARSER
+from rag.config import LOCAL_PARSER, DATA_DIR
 
 # Extensions handled by the document parser family (docling / liteparse)
 _DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".pptx"}
@@ -79,9 +80,23 @@ def _parse_plaintext(source: Path | str) -> ParseResult:
     source = Path(source)
     content = source.read_text(encoding="utf-8")
     content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+    stem = source.stem.replace(" ", "_").replace("-", "_").lower()
+    doc_dir = DATA_DIR / f"{stem}_{content_hash[:12]}"
+    parse_dir = doc_dir / "parse"
+    parse_dir.mkdir(parents=True, exist_ok=True)
+    (parse_dir / "converted.md").write_text(content, encoding="utf-8")
+    parse_result_meta = {
+        "content_hash": content_hash,
+        "source_path": str(source),
+        "content_type": "text",
+    }
+    (parse_dir / "parse_result.json").write_text(
+        json.dumps(parse_result_meta, indent=2), encoding="utf-8"
+    )
     return ParseResult(
         markdown=content,
         content_hash=content_hash,
         source_path=str(source),
         content_type="text",
+        doc_dir=doc_dir,
     )

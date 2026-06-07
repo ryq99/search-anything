@@ -1,6 +1,6 @@
 # Search Anything
 
-A local-first RAG (Retrieval-Augmented Generation) system for indexing and querying documents — optimized for ML books and technical content.
+RAG for personal knowledge base.
 
 ## Features
 

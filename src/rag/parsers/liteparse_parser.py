@@ -1,4 +1,5 @@
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -41,12 +42,17 @@ class LiteParseParser:
 
     def parse(self, source: Path | str) -> ParseResult:
         source = Path(source)
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Hash the raw file bytes first — parser-agnostic, stable folder name
+        content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        doc_dir = DATA_DIR / f"{_stem(source)}_{content_hash[:12]}"
+        parse_dir = doc_dir / "parse"
+        parse_dir.mkdir(parents=True, exist_ok=True)
 
         result = self._parser.parse(str(source))
         md_text = _clean_markdown(result.text or "")
 
-        # Validate BEFORE writing, so failed parses leave no orphan .md file behind
+        # Validate BEFORE writing, so failed parses leave no orphan files behind
         if len(md_text) < PARSER_MIN_CONTENT_LENGTH:
             raise ValueError(
                 f"Parsed content is suspiciously short ({len(md_text)} chars). "
@@ -54,17 +60,26 @@ class LiteParseParser:
                 f"(PARSER_ENABLE_OCR=true)."
             )
 
-        stem = _stem(source)
-        out_file = DATA_DIR / f"{stem}_converted.md"
+        # converted.md — human-readable audit artifact; chunking input
+        out_file = parse_dir / "converted.md"
         out_file.write_text(md_text, encoding="utf-8")
         print(f"[parser:liteparse] Saved markdown: {out_file} ({result.num_pages} pages)")
 
-        # LiteParse exposes no document hash; hash the raw file bytes
-        content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        # parse_result.json — ParseResult metadata; ties all parse artifacts together
+        parse_result_meta = {
+            "content_hash": content_hash,
+            "source_path": str(source),
+            "content_type": source.suffix.lower().lstrip("."),
+        }
+        (parse_dir / "parse_result.json").write_text(
+            json.dumps(parse_result_meta, indent=2), encoding="utf-8"
+        )
+        print(f"[parser:liteparse] Saved parse result: {parse_dir / 'parse_result.json'}")
 
         return ParseResult(
             markdown=md_text,
             content_hash=content_hash,
             source_path=str(source),
             content_type=source.suffix.lower().lstrip("."),
+            doc_dir=doc_dir,
         )
