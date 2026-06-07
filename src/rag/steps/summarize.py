@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from rag.core.interfaces import LLM
-from rag.config import DATA_DIR, SUMMARY_SEMAPHORE, SUMMARY_MAX_TOKENS
+from rag.config import SUMMARY_SEMAPHORE, SUMMARY_MAX_TOKENS
 
 _SYSTEM = (
     "Summarize the book contents with condensed form in 3-4 sentences. "
@@ -41,8 +41,10 @@ async def summarize_all(
     return dict(results)
 
 
-def save_summaries_csv(summaries: dict[str, str], stem: str) -> Path:
-    out_file = DATA_DIR / f"{stem}_parent_headings_summary.csv"
+def save_summaries_csv(summaries: dict[str, str], doc_dir: Path) -> Path:
+    summaries_dir = doc_dir / "summaries"
+    summaries_dir.mkdir(parents=True, exist_ok=True)
+    out_file = summaries_dir / "parent_headings.csv"
     pd.DataFrame(
         summaries.items(), columns=["Parent Headings", "Summary"]
     ).to_csv(out_file, index=False)

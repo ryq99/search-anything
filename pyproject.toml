@@ -5,24 +5,27 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "search-anything"
 version = "0.1.0"
-description = "Production-ready ML book RAG pipeline with switchable local/AWS backends"
+description = "Production-ready RAG pipeline with switchable methods and backends, designed for local and cloud deployment."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    # ── Parsing & chunking ──
+    # parsing/chunking
     "docling",
-    "liteparse",                # alternative local parser (native Rust core, built-in OCR)
-    "easyocr",                  # OCR engine for docling (scanned/mixed PDFs)
-    # ── Embedding & vector store (local) ──
-    "langchain-core",           # Document container at the Milvus boundary
+    "liteparse",
+    "easyocr",
+
+    # embedding/vectordb
+    "langchain-core",
     "langchain-huggingface",
     "langchain-milvus",
     "pymilvus",
     "sentence-transformers",
     "torch",
-    # ── LLM (local) ──
+    
+    # llm
     "anthropic",
-    # ── Misc ──
+
+    # data/io/obs
     "pandas",
     "python-dotenv",
     "watchdog",
@@ -38,15 +41,11 @@ aws = [
 search-anything = "main:main"
 
 [tool.setuptools]
-# main.py lives at the repo root (outside src/) as a top-level module so it can
-# back the console script while staying the `python main.py` entry point too.
 py-modules = ["main"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 namespaces = true
 
-# Map only the rag package into src/ (not the whole root namespace), leaving the
-# root free for the top-level main module above.
 [tool.setuptools.package-dir]
 rag = "src/rag"

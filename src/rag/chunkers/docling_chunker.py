@@ -68,7 +68,7 @@ class DoclingChunker:
             headings_str = " => ".join(headings_list)
             parent_headings_str = " => ".join(headings_list[:-1]) if len(headings_list) > 1 else ""
 
-            enriched = self._chunker.contextualize(chunk=dl_chunk)
+            enriched = self._chunker.contextualize(chunk=dl_chunk) # prepend the full heading ancestry to the raw chunk text
 
             chunk = Chunk(
                 text=dl_chunk.text,
@@ -92,16 +92,29 @@ class DoclingChunker:
         """
         Return the DoclingDocument to chunk.
 
-        Prefers the live object from DoclingParser (no round-trip). Falls back
-        to re-parsing the markdown artifact when DoclingDocument is unavailable
-        (liteparse or plaintext paths).
+        Priority:
+          1. Live in-memory object from DoclingParser (no I/O).
+          2. Persisted docling.json — enables re-chunking without re-parsing.
+          3. Markdown fallback — re-parse converted.md via docling's markdown
+             backend (lower structural fidelity; last resort).
         """
         if parse_result.docling_document is not None:
             return parse_result.docling_document
 
+        if parse_result.doc_dir is not None:
+            docling_json = parse_result.doc_dir / "parse" / "docling.json"
+            if docling_json.exists():
+                import json
+                from docling_core.types.doc import DoclingDocument
+                data = json.loads(docling_json.read_text(encoding="utf-8"))
+                return DoclingDocument.model_validate(data)
+
         # Markdown fallback: re-parse via docling's markdown backend
         from docling.document_converter import DocumentConverter
-        from rag.config import DATA_DIR
-        stem = Path(parse_result.source_path).stem.replace(" ", "_").replace("-", "_").lower()
-        md_path = DATA_DIR / f"{stem}_converted.md"
+        if parse_result.doc_dir is not None:
+            md_path = parse_result.doc_dir / "parse" / "converted.md"
+        else:
+            from rag.config import DATA_DIR
+            stem = Path(parse_result.source_path).stem.replace(" ", "_").replace("-", "_").lower()
+            md_path = DATA_DIR / f"{stem}_converted.md"
         return DocumentConverter().convert(str(md_path)).document

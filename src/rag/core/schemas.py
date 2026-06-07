@@ -1,19 +1,16 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 
 @dataclass
 class ParseResult:
-    # Secondary, human-readable serialization. Audit artifact + the chunking
-    # input for parsers that produce no DoclingDocument (liteparse/plaintext).
     markdown: str
-    content_hash: str   # hex string (from docling or SHA-256)
+    content_hash: str   # SHA-256 hex string of the raw source file bytes
     source_path: str    # original file path or URL
     content_type: str   # "pdf", "docx", "web", "notebook", etc.
-    # PRIMARY output for the docling path: the structured semantic tree that
-    # chunking consumes directly. None for liteparse/plaintext paths.
-    # Typed as Any so core/ stays free of heavy docling imports.
-    docling_document: Any = None
+    docling_document: Any = None # docling structured parse result (semantic tree)
+    doc_dir: Path | None = None # per-document data folder for outputs
 
 
 @dataclass
