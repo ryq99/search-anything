@@ -1,4 +1,5 @@
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -65,12 +66,17 @@ class DoclingParser:
 
     def parse(self, source: Path | str) -> ParseResult:
         source = Path(source)
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Hash the raw file bytes first — parser-agnostic, stable folder name
+        content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
+        doc_dir = DATA_DIR / f"{_stem(source)}_{content_hash[:12]}"
+        parse_dir = doc_dir / "parse"
+        parse_dir.mkdir(parents=True, exist_ok=True)
 
         result = self._converter.convert(str(source))
         md_text = _clean_markdown(_export_markdown(result.document))
 
-        # Validate BEFORE writing, so failed parses leave no orphan .md file behind
+        # Validate BEFORE writing, so failed parses leave no orphan files behind
         if len(md_text) < PARSER_MIN_CONTENT_LENGTH:
             raise ValueError(
                 f"Parsed content is suspiciously short ({len(md_text)} chars). "
@@ -78,27 +84,32 @@ class DoclingParser:
                 f"(PARSER_ENABLE_OCR=true) or pre-process with OCR."
             )
 
-        stem = _stem(source)
-        out_file = DATA_DIR / f"{stem}_converted.md"
-        out_file.write_text(md_text, encoding="utf-8")
-        print(f"[parser:docling] Saved markdown: {out_file}")
+        # converted.md — human-readable audit artifact; fallback chunking input
+        (parse_dir / "converted.md").write_text(md_text, encoding="utf-8")
+        print(f"[parser:docling] Saved markdown: {parse_dir / 'converted.md'}")
+
+        # docling.json — full structured document; enables re-chunking without re-parsing
+        (parse_dir / "docling.json").write_text(
+            json.dumps(result.document.export_to_dict()), encoding="utf-8"
+        )
+        print(f"[parser:docling] Saved docling document: {parse_dir / 'docling.json'}")
+
+        # parse_result.json — ParseResult metadata; ties all parse artifacts together
+        parse_result_meta = {
+            "content_hash": content_hash,
+            "source_path": str(source),
+            "content_type": source.suffix.lower().lstrip("."),
+        }
+        (parse_dir / "parse_result.json").write_text(
+            json.dumps(parse_result_meta, indent=2), encoding="utf-8"
+        )
+        print(f"[parser:docling] Saved parse result: {parse_dir / 'parse_result.json'}")
 
         return ParseResult(
             markdown=md_text,
-            content_hash=_content_hash(result.document, source),
+            content_hash=content_hash,
             source_path=str(source),
             content_type=source.suffix.lower().lstrip("."),
             docling_document=result.document,
+            doc_dir=doc_dir,
         )
-
-
-def _content_hash(document, source: Path) -> str:
-    """Prefer docling's document hash (hex string); fall back to SHA-256 of the file bytes."""
-    try:
-        raw_hash = document.export_to_dict().get("origin", {}).get("binary_hash")
-        if raw_hash:
-            # Docling returns a uint64 which can exceed int64 max; store as hex string
-            return hex(int(raw_hash))
-    except Exception:
-        pass
-    return hashlib.sha256(source.read_bytes()).hexdigest()
