@@ -1,7 +1,0 @@
-# Dependencies are declared in pyproject.toml (single source of truth).
-# Install the package in editable mode:
-#
-#   pip install -e .          # core (local backend)
-#   pip install -e ".[aws]"   # + AWS backend (S3 + DynamoDB + Bedrock)
-#
--e .
