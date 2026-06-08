@@ -69,7 +69,7 @@ class DoclingParser:
 
         # Hash the raw file bytes first — parser-agnostic, stable folder name
         content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-        doc_dir = DATA_DIR / f"{_stem(source)}_{content_hash[:12]}"
+        doc_dir = DATA_DIR / f"{_stem(source)}_{content_hash[:12]}_docling"
         parse_dir = doc_dir / "parse"
         parse_dir.mkdir(parents=True, exist_ok=True)
 
@@ -110,6 +110,7 @@ class DoclingParser:
             content_hash=content_hash,
             source_path=str(source),
             content_type=source.suffix.lower().lstrip("."),
+            parser="docling",
             docling_document=result.document,
             doc_dir=doc_dir,
         )
