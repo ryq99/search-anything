@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -9,8 +9,10 @@ class ParseResult:
     content_hash: str   # SHA-256 hex string of the raw source file bytes
     source_path: str    # original file path or URL
     content_type: str   # "pdf", "docx", "web", "notebook", etc.
-    docling_document: Any = None # docling structured parse result (semantic tree)
-    doc_dir: Path | None = None # per-document data folder for outputs
+    parser: str = ""          # parser used: "docling", "liteparse", "plaintext"
+    docling_document: Any = None  # docling: structured semantic tree (DoclingDocument)
+    liteparse_pages: Any = None   # liteparse: page-level data with font metadata (list[ParsedPage])
+    doc_dir: Path | None = None   # data/{stem}_{hash[:12]}_{parser}/
 
 
 @dataclass
@@ -28,15 +30,21 @@ class BookEntry:
     filename: str
     source_path: str
     content_hash: str
+    parser: str
     ingested_at: str
     chunk_count: int
     summary_artifact_path: str = ""
+
+    @property
+    def registry_key(self) -> str:
+        return f"{self.content_hash}_{self.parser}"
 
     def to_dict(self) -> dict:
         return {
             "filename": self.filename,
             "source_path": self.source_path,
             "content_hash": self.content_hash,
+            "parser": self.parser,
             "ingested_at": self.ingested_at,
             "chunk_count": self.chunk_count,
             "summary_artifact_path": self.summary_artifact_path,

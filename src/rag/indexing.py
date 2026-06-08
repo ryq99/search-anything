@@ -18,9 +18,9 @@ def ingest_source(source: Path | str) -> dict:
     print(f"[pipeline] Parsing {source.name}...")
     parse_result = parse_document(source)
 
-    if backend.registry.is_ingested(parse_result.content_hash):
-        print(f"[pipeline] Already ingested: {source.name} (hash={parse_result.content_hash[:10]}...)")
-        return backend.registry.get(parse_result.content_hash)
+    if backend.registry.is_ingested(parse_result.content_hash, parse_result.parser):
+        print(f"[pipeline] Already ingested: {source.name} ({parse_result.parser}, hash={parse_result.content_hash[:10]}...)")
+        return backend.registry.get(parse_result.content_hash, parse_result.parser)
 
     print("[pipeline] Chunking and enriching...")
     chunks, parent_headings_text = chunking_step.chunk_and_enrich(parse_result)
@@ -36,6 +36,7 @@ def ingest_source(source: Path | str) -> dict:
         filename=source.name,
         source_path=str(source.absolute()),
         content_hash=parse_result.content_hash,
+        parser=parse_result.parser,
         ingested_at=datetime.now(timezone.utc).isoformat(),
         chunk_count=len(chunks),
         summary_artifact_path=str(summary_path),

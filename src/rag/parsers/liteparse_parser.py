@@ -1,3 +1,4 @@
+import dataclasses
 import hashlib
 import json
 import re
@@ -5,6 +6,13 @@ from pathlib import Path
 
 from rag.core.schemas import ParseResult
 from rag.config import DATA_DIR, PARSER_ENABLE_OCR, PARSER_MIN_CONTENT_LENGTH
+from rag.parsers.heading_hierarchy import annotate_markdown_with_headings
+
+
+def _page_to_dict(page) -> dict:
+    if dataclasses.is_dataclass(page) and not isinstance(page, type):
+        return dataclasses.asdict(page)
+    return vars(page) if hasattr(page, "__dict__") else str(page)
 
 # File types liteparse handles natively (Rust core: PDF/Office/images)
 _LITEPARSE_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx"}
@@ -45,7 +53,7 @@ class LiteParseParser:
 
         # Hash the raw file bytes first — parser-agnostic, stable folder name
         content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-        doc_dir = DATA_DIR / f"{_stem(source)}_{content_hash[:12]}"
+        doc_dir = DATA_DIR / f"{_stem(source)}_{content_hash[:12]}_liteparse"
         parse_dir = doc_dir / "parse"
         parse_dir.mkdir(parents=True, exist_ok=True)
 
@@ -65,6 +73,14 @@ class LiteParseParser:
         out_file.write_text(md_text, encoding="utf-8")
         print(f"[parser:liteparse] Saved markdown: {out_file} ({result.num_pages} pages)")
 
+        # liteparse_pages.json — page-level font metadata; mirrors docling.json role
+        pages = getattr(result, "pages", None) or []
+        pages_data = [_page_to_dict(p) for p in pages]
+        (parse_dir / "liteparse_pages.json").write_text(
+            json.dumps(pages_data, indent=2), encoding="utf-8"
+        )
+        print(f"[parser:liteparse] Saved page metadata: {parse_dir / 'liteparse_pages.json'} ({len(pages)} pages)")
+
         # parse_result.json — ParseResult metadata; ties all parse artifacts together
         parse_result_meta = {
             "content_hash": content_hash,
@@ -76,10 +92,16 @@ class LiteParseParser:
         )
         print(f"[parser:liteparse] Saved parse result: {parse_dir / 'parse_result.json'}")
 
+        # Annotate with # markers inferred from font metadata — in memory only.
+        # converted.md preserves the raw liteparse output unchanged.
+        annotated_md = annotate_markdown_with_headings(md_text, pages_data) if pages_data else md_text
+
         return ParseResult(
-            markdown=md_text,
+            markdown=annotated_md,
             content_hash=content_hash,
             source_path=str(source),
             content_type=source.suffix.lower().lstrip("."),
+            parser="liteparse",
+            liteparse_pages=pages if pages else None,
             doc_dir=doc_dir,
         )

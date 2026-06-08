@@ -7,16 +7,16 @@ from rag.config import PROCESSED_BOOKS_PATH
 class JsonRegistry:
     """Book ingestion ledger backed by a local JSON file."""
 
-    def is_ingested(self, content_hash: str) -> bool:
-        return content_hash in self._load().get("books", {})
+    def is_ingested(self, content_hash: str, parser: str) -> bool:
+        return f"{content_hash}_{parser}" in self._load().get("books", {})
 
     def register(self, entry: BookEntry) -> None:
         data = self._load()
-        data.setdefault("books", {})[entry.content_hash] = entry.to_dict()
+        data.setdefault("books", {})[entry.registry_key] = entry.to_dict()
         PROCESSED_BOOKS_PATH.write_text(json.dumps(data, indent=2))
 
-    def get(self, content_hash: str) -> dict:
-        return self._load().get("books", {}).get(content_hash, {})
+    def get(self, content_hash: str, parser: str) -> dict:
+        return self._load().get("books", {}).get(f"{content_hash}_{parser}", {})
 
     def load_all(self) -> dict:
         return self._load()
