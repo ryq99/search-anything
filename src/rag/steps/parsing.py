@@ -1,33 +1,21 @@
 """
 Parsing step: the ingestion boundary of the pipeline.
 
-This is step 0 — it turns an arbitrary source (PDF, DOCX, plaintext, and later
-web/youtube) into a ParseResult. For docling, the *primary* output is a
-structured DoclingDocument (the parsed semantic tree that chunking consumes);
-markdown is emitted alongside it as a secondary, human-readable audit artifact.
-For liteparse/plaintext, only markdown is available.
-
-This step owns *orchestration*: content-type detection and selecting which
-concrete parser from `rag.parsers` to run. The parsers themselves are a
-pluggable family that lives in `rag/parsers/`; this step decides which one
-to call.
+Owns orchestration only — detects content type and routes to the appropriate
+parser plugin in rag/parsers/. Each parser is responsible for its own artifact
+saving and returns a ParseResult.
 """
-import hashlib
-import json
 from pathlib import Path
 
 from rag.core.schemas import ParseResult
-from rag.config import LOCAL_PARSER, DATA_DIR
+from rag.config import LOCAL_PARSER
 
-# Extensions handled by the document parser family (docling / liteparse)
 _DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".pptx"}
 _PASSTHROUGH_EXTENSIONS = {".md", ".txt"}
-
 SUPPORTED_EXTENSIONS = _DOCUMENT_EXTENSIONS | _PASSTHROUGH_EXTENSIONS
 
 
 def _get_document_parser():
-    """Select the local document parser based on the LOCAL_PARSER config flag."""
     if LOCAL_PARSER == "liteparse":
         from rag.parsers.liteparse_parser import LiteParseParser
         return LiteParseParser()
@@ -38,65 +26,21 @@ def _get_document_parser():
 def detect_content_type(source: Path | str) -> str:
     source_str = str(source)
     if source_str.startswith(("http://", "https://")):
-        if "youtube.com" in source_str or "youtu.be" in source_str:
-            return "youtube"
-        return "web"
-    ext = Path(source).suffix.lower()
+        return "youtube" if ("youtube.com" in source_str or "youtu.be" in source_str) else "web"
     return {
-        ".pdf":   "pdf",
-        ".docx":  "docx",
-        ".pptx":  "pptx",
-        ".ipynb": "notebook",
-        ".md":    "markdown",
-        ".txt":   "text",
-    }.get(ext, "unknown")
+        ".pdf": "pdf", ".docx": "docx", ".pptx": "pptx",
+        ".ipynb": "notebook", ".md": "markdown", ".txt": "text",
+    }.get(Path(source).suffix.lower(), "unknown")
 
 
 def parse_document(source: Path | str) -> ParseResult:
-    """
-    Detect content type and route to the appropriate parser.
-
-    Returns a ParseResult carrying the structured DoclingDocument (when docling
-    is used) plus markdown. Despite living in the "parsing" step, the real
-    output for the docling path is the DoclingDocument tree, not the markdown —
-    markdown is a side artifact.
-    """
     content_type = detect_content_type(source)
-
     if content_type in ("pdf", "docx", "pptx"):
         return _get_document_parser().parse(source)
-
     if content_type in ("markdown", "text"):
-        return _parse_plaintext(source)
-
+        from rag.parsers.plaintext_parser import PlaintextParser
+        return PlaintextParser().parse(source)
     raise NotImplementedError(
-        f"No parser registered for content type '{content_type}'. "
-        f"Supported: pdf, docx, pptx, markdown, text. "
-        f"Coming soon: web, notebook, youtube."
-    )
-
-
-def _parse_plaintext(source: Path | str) -> ParseResult:
-    source = Path(source)
-    content = source.read_text(encoding="utf-8")
-    content_hash = hashlib.sha256(source.read_bytes()).hexdigest()
-    stem = source.stem.replace(" ", "_").replace("-", "_").lower()
-    doc_dir = DATA_DIR / f"{stem}_{content_hash[:12]}"
-    parse_dir = doc_dir / "parse"
-    parse_dir.mkdir(parents=True, exist_ok=True)
-    (parse_dir / "converted.md").write_text(content, encoding="utf-8")
-    parse_result_meta = {
-        "content_hash": content_hash,
-        "source_path": str(source),
-        "content_type": "text",
-    }
-    (parse_dir / "parse_result.json").write_text(
-        json.dumps(parse_result_meta, indent=2), encoding="utf-8"
-    )
-    return ParseResult(
-        markdown=content,
-        content_hash=content_hash,
-        source_path=str(source),
-        content_type="text",
-        doc_dir=doc_dir,
+        f"No parser for content type '{content_type}'. "
+        f"Supported: pdf, docx, pptx, markdown, text. Coming soon: web, notebook, youtube."
     )

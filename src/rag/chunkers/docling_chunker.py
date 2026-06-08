@@ -3,6 +3,7 @@ from pathlib import Path
 from docling.chunking import HybridChunker
 
 from rag.core.schemas import Chunk, ParseResult
+from rag.parsers.heading_hierarchy import HeadingHierarchy
 from rag.config import (
     CHUNK_TOKENIZER,
     CHUNK_MAX_TOKENS,
@@ -20,8 +21,11 @@ class DoclingChunker:
     levels, reading order — without any markdown round-trip.
 
     When DoclingDocument is absent (liteparse or plaintext path), it falls back
-    to re-parsing the saved markdown file via docling's markdown backend. The
-    chunking logic is identical; only the structural fidelity differs.
+    to loading the persisted docling.json, then to re-parsing converted.md via
+    docling's markdown backend (lower structural fidelity; last resort).
+
+    Heading ancestry is reconstructed via HeadingHierarchy since docling's
+    meta.headings returns only the immediate heading, not the full ancestor chain.
 
     Text stored in enriched_text is the heading-prefixed version produced by
     chunker.contextualize() — this is what gets embedded, as heading context
@@ -29,62 +33,43 @@ class DoclingChunker:
     """
 
     def __init__(self) -> None:
-        # HybridChunker runs a 3-pass pipeline:
-        #   1. HierarchicalChunker  — split on document structure (headings, lists)
-        #   2. token-aware split    — break any chunk exceeding max_tokens
-        #   3. merge_peers          — recombine undersized same-heading neighbours
-        # All knobs are sourced from config so they can be tuned via .env.
         self._chunker = HybridChunker(
             tokenizer=CHUNK_TOKENIZER,
             max_tokens=CHUNK_MAX_TOKENS,
             merge_peers=CHUNK_MERGE_PEERS,
         )
-        # merge_list_items belongs to the inner hierarchical (1st) pass, which
-        # HybridChunker constructs internally. Apply it there when supported so
-        # the behaviour stays configurable across docling versions.
         inner = getattr(self._chunker, "_inner_chunker", None)
         if inner is not None and hasattr(inner, "merge_list_items"):
             try:
                 inner.merge_list_items = CHUNK_MERGE_LIST_ITEMS
             except (AttributeError, ValueError):
-                pass  # frozen model on some versions; default (True) stands
+                pass
 
     def chunk(self, parse_result: ParseResult) -> tuple[list[Chunk], dict[str, str]]:
-        """
-        Chunk the document and return enriched Chunk objects.
-
-        Returns:
-            chunks: list of Chunk ready for embedding and storage
-            parent_headings_text: {parent_heading_path: concatenated raw text}
-                                  used by the summarization stage
-        """
         dl_doc = self._get_docling_document(parse_result)
-
+        hierarchy = HeadingHierarchy()
         chunks: list[Chunk] = []
         parent_headings_text: dict[str, str] = {}
 
         for dl_chunk in self._chunker.chunk(dl_doc=dl_doc):
-            headings_list: list[str] = dl_chunk.meta.headings or []
-            headings_str = " => ".join(headings_list)
-            parent_headings_str = " => ".join(headings_list[:-1]) if len(headings_list) > 1 else ""
-
-            enriched = self._chunker.contextualize(chunk=dl_chunk) # prepend the full heading ancestry to the raw chunk text
+            raw_heading = (dl_chunk.meta.headings or [""])[0]
+            if raw_heading:
+                hierarchy.update(raw_heading)
 
             chunk = Chunk(
                 text=dl_chunk.text,
-                enriched_text=enriched,
-                headings=headings_str,
-                parent_headings=parent_headings_str,
+                enriched_text=self._chunker.contextualize(chunk=dl_chunk),
+                headings=hierarchy.path,
+                parent_headings=hierarchy.parent_path,
                 content_hash=parse_result.content_hash,
                 filename=parse_result.source_path.rsplit("/", 1)[-1],
             )
             chunks.append(chunk)
 
-            if parent_headings_str:
-                if parent_headings_str not in parent_headings_text:
-                    parent_headings_text[parent_headings_str] = dl_chunk.text
-                else:
-                    parent_headings_text[parent_headings_str] += "\n" + dl_chunk.text
+            if hierarchy.parent_path:
+                parent_headings_text[hierarchy.parent_path] = (
+                    parent_headings_text.get(hierarchy.parent_path, "") + "\n" + dl_chunk.text
+                ).lstrip("\n")
 
         return chunks, parent_headings_text
 
@@ -109,7 +94,6 @@ class DoclingChunker:
                 data = json.loads(docling_json.read_text(encoding="utf-8"))
                 return DoclingDocument.model_validate(data)
 
-        # Markdown fallback: re-parse via docling's markdown backend
         from docling.document_converter import DocumentConverter
         if parse_result.doc_dir is not None:
             md_path = parse_result.doc_dir / "parse" / "converted.md"
