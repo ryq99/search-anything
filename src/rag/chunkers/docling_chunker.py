@@ -1,15 +1,73 @@
+import re
 from pathlib import Path
 
 from docling.chunking import HybridChunker
 
 from rag.core.schemas import Chunk, ParseResult
-from rag.parsers.heading_hierarchy import HeadingHierarchy
 from rag.config import (
     CHUNK_TOKENIZER,
     CHUNK_MAX_TOKENS,
     CHUNK_MERGE_PEERS,
     CHUNK_MERGE_LIST_ITEMS,
 )
+
+
+class _HeadingHierarchy:
+    """
+    Reconstructs heading ancestry across sequential chunks.
+
+    Docling returns only the immediate heading per chunk, not the full ancestor
+    chain. This class maintains a level-indexed state and infers ancestry from
+    section number prefixes (e.g. "1.2.1" → level 3, ancestors "1", "1.2").
+
+    Eviction rules:
+      - Numbered entries that are not numeric ancestors of the current heading
+        are evicted.
+      - Non-numbered entries (e.g. "Preface") are evicted when a numbered
+        heading is pushed — they are frontmatter, not structural ancestors.
+    """
+
+    def __init__(self) -> None:
+        self._levels: dict[int, str] = {}
+
+    def update(self, heading: str) -> None:
+        level = _heading_level(heading)
+        for l in [l for l in self._levels if l >= level]:
+            del self._levels[l]
+        ancestors = _ancestor_numbers(heading)
+        is_numbered = bool(_section_number(heading))
+        for l in list(self._levels):
+            entry_num = _section_number(self._levels[l])
+            if (entry_num and entry_num not in ancestors) or (not entry_num and is_numbered):
+                del self._levels[l]
+        self._levels[level] = heading
+
+    @property
+    def path(self) -> str:
+        return " => ".join(self._levels[l] for l in sorted(self._levels))
+
+    @property
+    def parent_path(self) -> str:
+        levels = sorted(self._levels)
+        return " => ".join(self._levels[l] for l in levels[:-1])
+
+
+def _section_number(heading: str) -> str:
+    token = heading.split()[0] if heading.split() else ""
+    return token if re.match(r"^\d+(\.\d+)*$", token) else ""
+
+
+def _heading_level(heading: str) -> int:
+    num = _section_number(heading)
+    return num.count(".") + 1 if num else 1
+
+
+def _ancestor_numbers(heading: str) -> set[str]:
+    num = _section_number(heading)
+    if not num:
+        return set()
+    parts = num.split(".")
+    return {".".join(parts[:i + 1]) for i in range(len(parts) - 1)}
 
 
 class DoclingChunker:
@@ -24,7 +82,7 @@ class DoclingChunker:
     to loading the persisted docling.json, then to re-parsing converted.md via
     docling's markdown backend (lower structural fidelity; last resort).
 
-    Heading ancestry is reconstructed via HeadingHierarchy since docling's
+    Heading ancestry is reconstructed via _HeadingHierarchy since docling's
     meta.headings returns only the immediate heading, not the full ancestor chain.
 
     Text stored in enriched_text is the heading-prefixed version produced by
@@ -47,7 +105,7 @@ class DoclingChunker:
 
     def chunk(self, parse_result: ParseResult) -> tuple[list[Chunk], dict[str, str]]:
         dl_doc = self._get_docling_document(parse_result)
-        hierarchy = HeadingHierarchy()
+        hierarchy = _HeadingHierarchy()
         chunks: list[Chunk] = []
         parent_headings_text: dict[str, str] = {}
 
