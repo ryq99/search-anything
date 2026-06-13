@@ -26,7 +26,14 @@ class LiteParseChunker:
 
         for para in paragraphs:
             para_tokens = len(self._tokenizer.encode(para))
-            if current_tokens + para_tokens > CHUNK_MAX_TOKENS and current:
+            if para_tokens > CHUNK_MAX_TOKENS:
+                if current:
+                    chunks.append(self._make_chunk(parse_result, "\n\n".join(current)))
+                    current = []
+                    current_tokens = 0
+                for seg in self._split_sentences(para):
+                    chunks.append(self._make_chunk(parse_result, seg))
+            elif current_tokens + para_tokens > CHUNK_MAX_TOKENS:
                 chunks.append(self._make_chunk(parse_result, "\n\n".join(current)))
                 current = [para]
                 current_tokens = para_tokens
@@ -38,6 +45,27 @@ class LiteParseChunker:
             chunks.append(self._make_chunk(parse_result, "\n\n".join(current)))
 
         return chunks, {}
+
+    def _split_sentences(self, text: str) -> list[str]:
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        result: list[str] = []
+        current: list[str] = []
+        current_tokens = 0
+
+        for sent in sentences:
+            sent_tokens = len(self._tokenizer.encode(sent))
+            if current_tokens + sent_tokens > CHUNK_MAX_TOKENS and current:
+                result.append(" ".join(current))
+                current = [sent]
+                current_tokens = sent_tokens
+            else:
+                current.append(sent)
+                current_tokens += sent_tokens
+
+        if current:
+            result.append(" ".join(current))
+
+        return result or [text]
 
     def _make_chunk(self, parse_result: ParseResult, text: str) -> Chunk:
         return Chunk(
