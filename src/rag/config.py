@@ -47,7 +47,7 @@ CHUNK_MERGE_LIST_ITEMS = os.getenv("CHUNK_MERGE_LIST_ITEMS", "true").lower() == 
 # --- Models ---
 LOCAL_LLM_MODEL      = os.getenv("LOCAL_LLM_MODEL", "openai/gpt-oss-20b")   # self-hosted via HuggingFace
 API_LLM_MODEL        = os.getenv("API_LLM_MODEL",   "claude-haiku-4-5-20251001")  # Anthropic API
-SYNTHESIS_MODEL      = os.getenv("SYNTHESIS_MODEL", "claude-haiku-4-5-20251001")
+SYNTHESIS_MODEL      = os.getenv("SYNTHESIS_MODEL", "claude-sonnet-4-6")
 SUMMARY_SEMAPHORE    = 5
 SUMMARY_MAX_TOKENS   = 1000
 SYNTHESIS_MAX_TOKENS = 8192
