@@ -65,6 +65,7 @@ class MilvusVectorStore:
                     "filename": chunk.filename,
                     "headings": chunk.headings,
                     "parent_headings": chunk.parent_headings,
+                    "summary": chunk.summary,
                     "raw_text": chunk.text,  # raw text preserved for display
                 },
             ))

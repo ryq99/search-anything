@@ -45,7 +45,9 @@ CHUNK_MERGE_PEERS = os.getenv("CHUNK_MERGE_PEERS", "true").lower() == "true"
 CHUNK_MERGE_LIST_ITEMS = os.getenv("CHUNK_MERGE_LIST_ITEMS", "true").lower() == "true"
 
 # --- Models ---
-LOCAL_LLM_MODEL      = os.getenv("LOCAL_LLM_MODEL", "openai/gpt-oss-20b")   # self-hosted via HuggingFace
+LOCAL_LLM_MODEL      = os.getenv("LOCAL_LLM_MODEL", "gemma4:e4b")           # local via Ollama or HuggingFace TGI
+LOCAL_LLM_BASE_URL   = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434/v1")  # Ollama default
+LOCAL_LLM_API_KEY    = os.getenv("LOCAL_LLM_API_KEY", "ollama")             # placeholder; TGI needs a real key
 API_LLM_MODEL        = os.getenv("API_LLM_MODEL",   "claude-haiku-4-5-20251001")  # Anthropic API
 SYNTHESIS_MODEL      = os.getenv("SYNTHESIS_MODEL", "claude-sonnet-4-6")
 SUMMARY_SEMAPHORE    = 5

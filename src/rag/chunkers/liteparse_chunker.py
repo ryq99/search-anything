@@ -18,7 +18,7 @@ class LiteParseChunker:
         from transformers import AutoTokenizer
         self._tokenizer = AutoTokenizer.from_pretrained(CHUNK_TOKENIZER)
 
-    def chunk(self, parse_result: ParseResult) -> tuple[list[Chunk], dict[str, str]]:
+    def chunk(self, parse_result: ParseResult) -> list[Chunk]:
         # split the full markdown into paragraphs on blank lines; skip empty segments
         paragraphs = [p.strip() for p in re.split(r"\n\n+", parse_result.markdown) if p.strip()]
         chunks: list[Chunk] = []
@@ -54,7 +54,7 @@ class LiteParseChunker:
         if current:
             chunks.append(self._make_chunk(parse_result, "\n\n".join(current)))
 
-        return chunks, {}  # empty dict: no heading groups to summarize
+        return chunks
 
     def _split_sentences(self, text: str) -> list[str]:
         # split on sentence-ending punctuation followed by whitespace

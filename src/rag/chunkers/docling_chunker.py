@@ -103,33 +103,26 @@ class DoclingChunker:
             except (AttributeError, ValueError):
                 pass
 
-    def chunk(self, parse_result: ParseResult) -> tuple[list[Chunk], dict[str, str]]:
+    def chunk(self, parse_result: ParseResult) -> list[Chunk]:
         dl_doc = self._get_docling_document(parse_result)
         hierarchy = _HeadingHierarchy()
         chunks: list[Chunk] = []
-        parent_headings_text: dict[str, str] = {}
 
         for dl_chunk in self._chunker.chunk(dl_doc=dl_doc):
             raw_heading = (dl_chunk.meta.headings or [""])[0]
             if raw_heading:
                 hierarchy.update(raw_heading)
 
-            chunk = Chunk(
+            chunks.append(Chunk(
                 text=dl_chunk.text,
                 enriched_text=self._chunker.contextualize(chunk=dl_chunk),
                 headings=hierarchy.path,
                 parent_headings=hierarchy.parent_path,
                 content_hash=parse_result.content_hash,
                 filename=parse_result.source_path.rsplit("/", 1)[-1],
-            )
-            chunks.append(chunk)
+            ))
 
-            if hierarchy.parent_path:
-                parent_headings_text[hierarchy.parent_path] = (
-                    parent_headings_text.get(hierarchy.parent_path, "") + "\n" + dl_chunk.text
-                ).lstrip("\n")
-
-        return chunks, parent_headings_text
+        return chunks
 
     def _get_docling_document(self, parse_result: ParseResult):
         """
