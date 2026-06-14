@@ -8,7 +8,7 @@ from rag.steps import summarize as summarize_step
 from rag.backends.factory import get_backend
 from rag.backends.local.llm import LocalLLM
 from rag.core.schemas import BookEntry
-from rag.config import BOOKS_DIR
+from rag.config import BOOKS_DIR, LOCAL_PARSER
 
 
 def ingest_source(source: Path | str) -> dict:
@@ -60,9 +60,12 @@ def ingest_directory(directory: Path | None = None) -> list[dict]:
     for path in sorted(directory.iterdir()):
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             continue
-        already = any(e.get("filename") == path.name for e in all_entries.values())
+        already = any(
+            e.get("filename") == path.name and e.get("parser") == LOCAL_PARSER
+            for e in all_entries.values()
+        )
         if already:
-            print(f"[pipeline] Skipping (already ingested): {path.name}")
+            print(f"[pipeline] Skipping (already ingested with {LOCAL_PARSER}): {path.name}")
             continue
         results.append(ingest_source(path))
     return results
