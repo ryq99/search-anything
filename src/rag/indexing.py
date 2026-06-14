@@ -6,8 +6,9 @@ from rag.steps.parsing import parse_document, SUPPORTED_EXTENSIONS
 from rag.steps import chunking as chunking_step
 from rag.steps import summarize as summarize_step
 from rag.backends.factory import get_backend
+from rag.backends.local.llm import LocalLLM
 from rag.core.schemas import BookEntry
-from rag.config import BOOKS_DIR
+from rag.config import BOOKS_DIR, LOCAL_PARSER
 
 
 def ingest_source(source: Path | str) -> dict:
@@ -23,11 +24,13 @@ def ingest_source(source: Path | str) -> dict:
         return backend.registry.get(parse_result.content_hash, parse_result.parser)
 
     print("[pipeline] Chunking and enriching...")
-    chunks, parent_headings_text = chunking_step.chunk_and_enrich(parse_result)
+    chunks = chunking_step.chunk_and_enrich(parse_result)
 
-    print(f"[pipeline] Summarizing {len(parent_headings_text)} parent heading groups...")
-    summaries = asyncio.run(summarize_step.summarize_all(parent_headings_text, backend.llm))
-    summary_path = summarize_step.save_summaries_csv(summaries, parse_result.doc_dir)
+    print(f"[pipeline] Summarizing {len(chunks)} chunks...")
+    asyncio.run(summarize_step.summarize_chunks(chunks, LocalLLM()))
+
+    if parse_result.doc_dir is not None:
+        chunking_step.save_chunks_jsonl(chunks, parse_result.doc_dir)
 
     print(f"[pipeline] Embedding and storing {len(chunks)} chunks...")
     backend.vectorstore.store(chunks)
@@ -39,7 +42,6 @@ def ingest_source(source: Path | str) -> dict:
         parser=parse_result.parser,
         ingested_at=datetime.now(timezone.utc).isoformat(),
         chunk_count=len(chunks),
-        summary_artifact_path=str(summary_path),
     )
     backend.registry.register(entry)
 
@@ -58,9 +60,12 @@ def ingest_directory(directory: Path | None = None) -> list[dict]:
     for path in sorted(directory.iterdir()):
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             continue
-        already = any(e.get("filename") == path.name for e in all_entries.values())
+        already = any(
+            e.get("filename") == path.name and e.get("parser") == LOCAL_PARSER
+            for e in all_entries.values()
+        )
         if already:
-            print(f"[pipeline] Skipping (already ingested): {path.name}")
+            print(f"[pipeline] Skipping (already ingested with {LOCAL_PARSER}): {path.name}")
             continue
         results.append(ingest_source(path))
     return results
@@ -99,6 +104,7 @@ def start_watcher(books_dir: Path | None = None) -> None:
     print(f"[watcher] Watching {books_dir}. Press Ctrl+C to stop.")
     try:
         while True:
+            import time
             time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()

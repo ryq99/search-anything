@@ -1,107 +1,92 @@
 import re
 
 from rag.core.schemas import Chunk, ParseResult
-from rag.parsers.heading_hierarchy import HeadingHierarchy
 from rag.config import CHUNK_MAX_TOKENS, CHUNK_TOKENIZER
 
 
 class LiteParseChunker:
     """
-    Markdown-native chunker for LiteParseParser output. No docling dependency.
+    Paragraph-based chunker for LiteParseParser output.
 
-    Pipeline:
-      1. Split on markdown headings (#, ##, ###...) — structural boundary pass
-      2. Token-aware split — break any section exceeding max_tokens by paragraph
-      3. Enrich — prepend full heading path to each chunk text for embedding
-
-    Heading hierarchy is tracked via HeadingHierarchy (explicit # level),
-    consistent with how DoclingChunker tracks it via section number inference.
-    Enrichment mirrors docling's contextualize() output so the embedding input
-    format is consistent across both parser paths.
+    Splits on double-newline paragraph boundaries, merging consecutive
+    paragraphs until CHUNK_MAX_TOKENS is reached. No heading structure
+    is inferred — liteparse produces layout-preserving markdown without
+    reliable semantic markers, so heading fields are left empty.
     """
 
     def __init__(self) -> None:
         from transformers import AutoTokenizer
         self._tokenizer = AutoTokenizer.from_pretrained(CHUNK_TOKENIZER)
 
-    def chunk(self, parse_result: ParseResult) -> tuple[list[Chunk], dict[str, str]]:
-        hierarchy = HeadingHierarchy()
+    def chunk(self, parse_result: ParseResult) -> list[Chunk]:
+        # split the full markdown into paragraphs on blank lines; skip empty segments
+        paragraphs = [p.strip() for p in re.split(r"\n\n+", parse_result.markdown) if p.strip()]
         chunks: list[Chunk] = []
-        parent_headings_text: dict[str, str] = {}
+        current: list[str] = []   # paragraphs staged for the next chunk
+        current_tokens = 0        # running token count of staged paragraphs
 
-        for level, title, text in _split_by_headings(parse_result.markdown):
-            if title:
-                hierarchy.update(title, level=level)
+        for para in paragraphs:
+            para_tokens = len(self._tokenizer.encode(para))
 
-            for sub_text in self._split_by_tokens(text):
-                chunk = Chunk(
-                    text=sub_text,
-                    enriched_text=_contextualize(hierarchy.path, sub_text),
-                    headings=hierarchy.path,
-                    parent_headings=hierarchy.parent_path,
-                    content_hash=parse_result.content_hash,
-                    filename=parse_result.source_path.rsplit("/", 1)[-1],
-                )
-                chunks.append(chunk)
+            if para_tokens > CHUNK_MAX_TOKENS:
+                # paragraph alone exceeds the limit — flush what's staged, then
+                # fall back to sentence-level splitting for this paragraph
+                if current:
+                    chunks.append(self._make_chunk(parse_result, "\n\n".join(current)))
+                    current = []
+                    current_tokens = 0
+                for seg in self._split_sentences(para):
+                    chunks.append(self._make_chunk(parse_result, seg))
 
-            if hierarchy.parent_path:
-                parent_headings_text[hierarchy.parent_path] = (
-                    parent_headings_text.get(hierarchy.parent_path, "") + "\n" + text
-                ).lstrip("\n")
+            elif current_tokens + para_tokens > CHUNK_MAX_TOKENS:
+                # adding this paragraph would overflow — flush staged paragraphs
+                # as a chunk, then start a fresh accumulator with this paragraph
+                chunks.append(self._make_chunk(parse_result, "\n\n".join(current)))
+                current = [para]
+                current_tokens = para_tokens
 
-        return chunks, parent_headings_text
+            else:
+                # paragraph fits — keep accumulating
+                current.append(para)
+                current_tokens += para_tokens
 
-    def _split_by_tokens(self, text: str) -> list[str]:
-        """Split text into token-bounded segments by paragraph boundaries."""
-        if len(self._tokenizer.encode(text)) <= CHUNK_MAX_TOKENS:
-            return [text]
+        # emit any remaining staged paragraphs as the final chunk
+        if current:
+            chunks.append(self._make_chunk(parse_result, "\n\n".join(current)))
 
-        paragraphs = [p.strip() for p in re.split(r"\n\n+", text) if p.strip()]
+        return chunks
+
+    def _split_sentences(self, text: str) -> list[str]:
+        # split on sentence-ending punctuation followed by whitespace
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
         result: list[str] = []
         current: list[str] = []
         current_tokens = 0
 
-        for para in paragraphs:
-            para_tokens = len(self._tokenizer.encode(para))
-            if current_tokens + para_tokens > CHUNK_MAX_TOKENS and current:
-                result.append("\n\n".join(current))
-                current = [para]
-                current_tokens = para_tokens
+        for sent in sentences:
+            sent_tokens = len(self._tokenizer.encode(sent))
+            if current_tokens + sent_tokens > CHUNK_MAX_TOKENS and current:
+                # flush staged sentences and start fresh
+                result.append(" ".join(current))
+                current = [sent]
+                current_tokens = sent_tokens
             else:
-                current.append(para)
-                current_tokens += para_tokens
+                current.append(sent)
+                current_tokens += sent_tokens
 
         if current:
-            result.append("\n\n".join(current))
+            result.append(" ".join(current))
 
+        # if even a single sentence exceeds the limit, emit it as-is rather than
+        # breaking mid-sentence
         return result or [text]
 
-
-def _split_by_headings(markdown: str) -> list[tuple[int, str, str]]:
-    """
-    Split markdown into (level, heading_title, content) triples.
-
-    level=0 and title='' for content that appears before the first heading.
-    """
-    heading_re = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
-    sections: list[tuple[int, str, str]] = []
-    current_level, current_title, last_pos = 0, "", 0
-
-    for match in heading_re.finditer(markdown):
-        text_before = markdown[last_pos:match.start()].strip()
-        if text_before:
-            sections.append((current_level, current_title, text_before))
-        current_level = len(match.group(1))
-        current_title = match.group(2).strip()
-        last_pos = match.end()
-
-    remaining = markdown[last_pos:].strip()
-    if remaining:
-        sections.append((current_level, current_title, remaining))
-
-    return [(l, t, s) for l, t, s in sections if s]
-
-
-def _contextualize(path: str, text: str) -> str:
-    """Prepend heading path to text, mirroring docling HybridChunker.contextualize()."""
-    return f"{path}\n\n{text}" if path else text
+    def _make_chunk(self, parse_result: ParseResult, text: str) -> Chunk:
+        return Chunk(
+            text=text,
+            enriched_text=text,  # no heading prefix for liteparse chunks
+            headings="",
+            parent_headings="",
+            content_hash=parse_result.content_hash,
+            filename=parse_result.source_path.rsplit("/", 1)[-1],
+        )

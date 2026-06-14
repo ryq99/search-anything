@@ -33,11 +33,9 @@ def save_chunks_jsonl(chunks: list[Chunk], doc_dir: Path) -> Path:
     return out_file
 
 
-def chunk_and_enrich(parse_result: ParseResult) -> tuple[list[Chunk], dict[str, str]]:
+def chunk_and_enrich(parse_result: ParseResult) -> list[Chunk]:
     """Route to the configured chunker and return enriched Chunk objects."""
     chunker = _get_chunker()
-    chunks, parent_headings_text = chunker.chunk(parse_result)
-    print(f"[chunking] Created {len(chunks)} chunks, {len(parent_headings_text)} parent heading groups")
-    if parse_result.doc_dir is not None:
-        save_chunks_jsonl(chunks, parse_result.doc_dir)
-    return chunks, parent_headings_text
+    chunks = chunker.chunk(parse_result)
+    print(f"[chunking] Created {len(chunks)} chunks")
+    return chunks
