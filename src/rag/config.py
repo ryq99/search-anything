@@ -45,10 +45,17 @@ CHUNK_MERGE_PEERS = os.getenv("CHUNK_MERGE_PEERS", "true").lower() == "true"
 CHUNK_MERGE_LIST_ITEMS = os.getenv("CHUNK_MERGE_LIST_ITEMS", "true").lower() == "true"
 
 # --- Models ---
-LOCAL_LLM_MODEL      = os.getenv("LOCAL_LLM_MODEL", "gemma4:e4b")           # Ollama model for summarization
-LOCAL_LLM_BASE_URL   = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434")   # Ollama server base URL
-API_LLM_MODEL        = os.getenv("API_LLM_MODEL",   "claude-haiku-4-5-20251001")  # Anthropic API for synthesis
-SYNTHESIS_MODEL      = os.getenv("SYNTHESIS_MODEL", "claude-sonnet-4-6")
+# Ollama base URL (local mode only)
+LOCAL_LLM_BASE_URL       = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434")
+
+# Chunk summarization (indexing-time)
+LOCAL_SUMMARY_MODEL      = os.getenv("LOCAL_SUMMARY_MODEL",  "gemma4:e4b")
+CLOUD_SUMMARY_MODEL      = os.getenv("CLOUD_SUMMARY_MODEL",  "claude-haiku-4-5-20251001")
+
+# Answer synthesis (query-time)
+LOCAL_SYNTHESIS_MODEL    = os.getenv("LOCAL_SYNTHESIS_MODEL", "gemma4:e4b")
+CLOUD_SYNTHESIS_MODEL    = os.getenv("CLOUD_SYNTHESIS_MODEL", "claude-sonnet-4-6")
+
 SUMMARY_SEMAPHORE    = 5
 SUMMARY_MAX_TOKENS   = 1000
 SYNTHESIS_MAX_TOKENS = 8192

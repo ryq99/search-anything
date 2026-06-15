@@ -1,32 +1,39 @@
 from dataclasses import dataclass
 
-from rag.config import CLOUD_BACKEND
+from rag.config import (
+    CLOUD_BACKEND,
+    LOCAL_SUMMARY_MODEL, CLOUD_SUMMARY_MODEL,
+    LOCAL_SYNTHESIS_MODEL, CLOUD_SYNTHESIS_MODEL,
+)
 
 
 @dataclass
 class Backend:
     registry: object
     vectorstore: object
-    llm: object
+    summary_llm: object    # used at indexing time for chunk summarization
+    synthesis_llm: object  # used at query time for answer generation
 
 
 def get_backend() -> Backend:
-    """Return the concrete backend set selected by CLOUD_BACKEND env var."""
+    """Return the concrete backend selected by CLOUD_BACKEND env var."""
     if CLOUD_BACKEND == "aws":
         from rag.backends.aws.registry import DynamoDBRegistry
         from rag.backends.aws.vectorstore import BedrockKBVectorStore
-        from rag.backends.aws.llm import BedrockLLM
+        from rag.backends.local.llm import AnthropicLLM
         return Backend(
             registry=DynamoDBRegistry(),
             vectorstore=BedrockKBVectorStore(),
-            llm=BedrockLLM(),
+            summary_llm=AnthropicLLM(CLOUD_SUMMARY_MODEL),
+            synthesis_llm=AnthropicLLM(CLOUD_SYNTHESIS_MODEL),
         )
 
     from rag.backends.local.registry import JsonRegistry
     from rag.backends.local.vectorstore import MilvusVectorStore
-    from rag.backends.local.llm import AnthropicLLM
+    from rag.backends.local.llm import LocalLLM
     return Backend(
         registry=JsonRegistry(),
         vectorstore=MilvusVectorStore(),
-        llm=AnthropicLLM(),
+        summary_llm=LocalLLM(LOCAL_SUMMARY_MODEL),
+        synthesis_llm=LocalLLM(LOCAL_SYNTHESIS_MODEL),
     )

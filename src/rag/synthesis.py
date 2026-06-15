@@ -1,6 +1,5 @@
-import anthropic
-
-from rag.config import ANTHROPIC_API_KEY, SYNTHESIS_MODEL, SYNTHESIS_MAX_TOKENS
+from rag.config import SYNTHESIS_MAX_TOKENS
+from rag.core.interfaces import LLM
 
 
 SYSTEM_PROMPT = (
@@ -37,12 +36,9 @@ def _build_user_message(question: str, retrieval_results_str: str) -> str:
     )
 
 
-def ask(question: str, retrieval_results_str: str) -> str:
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-    message = client.messages.create(
-        model=SYNTHESIS_MODEL,
-        max_tokens=SYNTHESIS_MAX_TOKENS,
+def ask(question: str, retrieval_results_str: str, model: LLM) -> str:
+    return model.complete(
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _build_user_message(question, retrieval_results_str)}],
+        user=_build_user_message(question, retrieval_results_str),
+        max_tokens=SYNTHESIS_MAX_TOKENS,
     )
-    return message.content[0].text

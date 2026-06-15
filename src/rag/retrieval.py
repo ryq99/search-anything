@@ -50,6 +50,6 @@ def format_retrieval_results(chunks: list[dict]) -> str:
 def ask(question: str) -> str:
     """Retrieve relevant chunks and synthesize an answer."""
     from rag.backends.factory import get_backend
-    vs = get_backend().vectorstore.get_store()
-    chunks = retrieve(question, vectorstore=vs)
-    return _synthesize(question, format_retrieval_results(chunks))
+    backend = get_backend()
+    chunks = retrieve(question, vectorstore=backend.vectorstore.get_store())
+    return _synthesize(question, format_retrieval_results(chunks), backend.synthesis_llm)
