@@ -4,34 +4,30 @@ RAG for personal knowledge base.
 
 ## Features
 
-- **Multi-format ingestion** — PDF, DOCX, PPTX, Markdown, and plain text
-- **Pluggable parsers** — `docling` (ML layout model, default) or `liteparse` (fast native Rust + Tesseract OCR), switchable via `LOCAL_PARSER`
-- **Structure-native chunking** — DoclingChunker operates on the live DoclingDocument tree (no markdown round-trip); heading ancestry is derived directly from docling's semantic structure
-- **Heading-contextualized embeddings** — `chunker.contextualize()` prefixes each chunk with its heading path before embedding, materially improving retrieval quality for section-level queries
-- **Section summaries** — async per-heading summaries stored alongside chunks for richer retrieval context
+- **Multi-format ingestion** — PDF, DOCX, PPTX, Markdown, plain text
+- **Pluggable parsers** — `docling` (ML layout model) or `liteparse` (Rust + Tesseract OCR)
+- **Structure-native chunking** — DoclingChunker operates on the live DoclingDocument tree; LiteParseChunker uses paragraph-boundary splitting with sentence-level fallback
+- **Heading-contextualized embeddings** — heading path prepended to each chunk before embedding
+- **Per-chunk summaries** — Gemma4 (local) or Claude Haiku (cloud) summarizes each chunk at index time; summaries stored in Milvus and returned at retrieval
 - **Idempotent pipeline** — SHA-256 content hash prevents double-ingestion
-- **File watcher** — `watch` command auto-ingests files dropped into `books/`
-- **Dual backend** — `local` (Milvus Lite + Anthropic API) or `aws` (Bedrock + DynamoDB), switched via `CLOUD_BACKEND`
+- **File watcher** — `watch` auto-ingests files dropped into `books/`
+- **Dual backend** — `local` (Milvus Lite + Ollama) or `aws` (Bedrock + DynamoDB)
 
 ## Setup
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-
-pip install -e .          # local backend
-pip install -e ".[aws]"   # + AWS backend (S3 + DynamoDB + Bedrock)
-```
-
-Copy `.env.example` to `.env` and fill in your keys:
-
-```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -e .           # local backend
+pip install -e ".[aws]"    # + AWS backend
 cp .env.example .env
 ```
 
-## Workflow
+Pull the local LLM:
+```bash
+ollama pull gemma4:e4b
+```
 
-Indexing
+## Indexing Pipeline
 
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
@@ -42,35 +38,33 @@ flowchart LR
     subgraph B["1. Parse"]
         direction TB
         B1("docling
-        ML layout model
-        DoclingDocument")
+        ML layout → DoclingDocument")
         B2("liteparse
-        fast Rust + OCR
-        outputs markdown")
-        B3("plain text / MD
+        Rust + OCR → markdown")
+        B3("plaintext
         passthrough")
     end
 
     C("ParseResult
     SHA-256 content hash")
 
-    subgraph D["2. Chunk + Enrich"]
+    subgraph D["2. Chunk"]
         direction TB
-        D1("HierarchicalChunker
-        split on headings & lists")
-        D2("Token-aware split
-        max CHUNK_MAX_TOKENS")
-        D3("merge_peers
-        merge undersized neighbours")
-        D1 --> D2 --> D3
+        D1("DoclingChunker
+        HybridChunker on document tree
+        heading ancestry + enriched_text")
+        D2("LiteParseChunker
+        paragraph split → sentence fallback
+        token-bounded greedy merge")
     end
 
     E("Chunk objects
-    text + enriched_text + metadata")
+    text · enriched_text · headings · summary")
 
-    F("3. Section Summarization
-    Claude summarizes per heading group
-    concurrently — summaries CSV")
+    F("3. Summarize
+    Gemma4 via Ollama — local
+    Claude Haiku via Anthropic — cloud
+    async · per chunk · stored in-place")
 
     G("4. Embed + Store
     Snowflake Arctic Embed L v2.0")
@@ -85,42 +79,34 @@ flowchart LR
     AWS registry")
 
     A --> B --> C --> D --> E --> F --> G
-    G --> H1
-    G --> H2
-    F --> I1
-    F --> I2
+    G --> H1 & H2
+    G --> I1 & I2
 ```
 
-### Commands
+## Commands
 
 ```bash
-# Ingest all new files in books/
-python main.py ingest
-# or, if installed as a package:
-search-anything ingest
-
-# Ingest specific files
-python main.py ingest --paths books/deeplearning.pdf books/notes.md
-
-# Watch books/ and auto-ingest on file creation (performs catch-up on startup)
-python main.py watch
+python main.py ingest                                    # ingest all files in books/
+python main.py ingest --paths books/a.pdf books/b.pdf   # specific files
+python main.py ask "What is gradient descent?"           # query
+python main.py watch                                     # watch books/ and auto-ingest
 ```
 
-Files already present in the registry (matched by content hash) are skipped automatically.
+Files already in the registry (matched by content hash + parser) are skipped.
 
 ## Configuration
 
-All tunables are in [src/rag/config.py](src/rag/config.py) and overridable via `.env`. See [.env.example](.env.example) for the full list.
+All tunables are in [src/rag/config.py](src/rag/config.py), overridable via `.env`. See [.env.example](.env.example) for the full list.
 
 | Variable | Default | Description |
 |---|---|---|
 | `CLOUD_BACKEND` | `local` | `local` or `aws` |
-| `LOCAL_PARSER` | `liteparse` | `liteparse` (fast Rust + OCR) or `docling` (ML layout) |
-| `PARSER_ENABLE_OCR` | `true` | OCR on scanned/mixed pages |
-| `LOCAL_CHUNKER` | `liteparse` | `liteparse` (markdown-native) or `docling` (structure-native) |
+| `LOCAL_PARSER` | `liteparse` | `liteparse` or `docling` |
+| `LOCAL_CHUNKER` | `liteparse` | `liteparse` or `docling` |
 | `CHUNK_MAX_TOKENS` | `1024` | Hard token ceiling per chunk |
-| `CHUNK_MERGE_PEERS` | `true` | Merge undersized same-heading neighbours |
-| `CHUNK_MERGE_LIST_ITEMS` | `true` | Collapse consecutive list items into one chunk |
-| `EMBED_MODEL_ID` | `Snowflake/snowflake-arctic-embed-l-v2.0` | HuggingFace embedding model |
-| `RETRIEVAL_K` | `10` | Number of chunks to retrieve |
-| `SYNTHESIS_MODEL` | `claude-haiku-4-5-20251001` | Model for answer synthesis |
+| `LOCAL_SUMMARY_MODEL` | `gemma4:e4b` | Ollama model for summarization (local) |
+| `CLOUD_SUMMARY_MODEL` | `claude-haiku-4-5-20251001` | Anthropic model for summarization (cloud) |
+| `LOCAL_SYNTHESIS_MODEL` | `gemma4:e4b` | Ollama model for answer synthesis (local) |
+| `CLOUD_SYNTHESIS_MODEL` | `claude-sonnet-4-6` | Anthropic model for answer synthesis (cloud) |
+| `LOCAL_LLM_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| `RETRIEVAL_K` | `10` | Chunks retrieved per query |
