@@ -1,52 +1,27 @@
 import asyncio
-from pathlib import Path
 
-import pandas as pd
-
-from rag.core.interfaces import LLM
+from rag.core.schemas import Chunk
 from rag.config import SUMMARY_SEMAPHORE, SUMMARY_MAX_TOKENS
 
 _SYSTEM = (
-    "Summarize the book contents with condensed form in 3-4 sentences. "
-    "Cover the main topics, definition, proof, methods, and applications if any."
+    "Summarize the following text in 1-2 sentences covering the main point."
 )
 
 
-async def _summarize_one(
-    llm: LLM,
-    semaphore: asyncio.Semaphore,
-    parent_headings: str,
-    text: str,
-) -> tuple[str, str]:
+async def _summarize_chunk(llm, semaphore: asyncio.Semaphore, chunk: Chunk) -> str:
     async with semaphore:
-        summary = await llm.acomplete(
+        return await llm.acomplete(
             system=_SYSTEM,
-            user=f"Summarize the following text:\n\n{text}",
+            user=chunk.text,
             max_tokens=SUMMARY_MAX_TOKENS,
         )
-        return parent_headings, summary
 
 
-async def summarize_all(
-    parent_headings_text: dict[str, str],
-    llm: LLM,
-) -> dict[str, str]:
-    """Concurrently summarize all parent heading groups using the provided LLM."""
+async def summarize_chunks(chunks: list[Chunk], llm) -> None:
+    """Concurrently fill chunk.summary in-place for all chunks."""
     semaphore = asyncio.Semaphore(SUMMARY_SEMAPHORE)
-    tasks = [
-        _summarize_one(llm, semaphore, ph, text)
-        for ph, text in parent_headings_text.items()
-    ]
-    results = await asyncio.gather(*tasks)
-    return dict(results)
-
-
-def save_summaries_csv(summaries: dict[str, str], doc_dir: Path) -> Path:
-    summaries_dir = doc_dir / "summaries"
-    summaries_dir.mkdir(parents=True, exist_ok=True)
-    out_file = summaries_dir / "parent_headings.csv"
-    pd.DataFrame(
-        summaries.items(), columns=["Parent Headings", "Summary"]
-    ).to_csv(out_file, index=False)
-    print(f"[summarize] Saved summaries: {out_file}")
-    return out_file
+    summaries = await asyncio.gather(
+        *[_summarize_chunk(llm, semaphore, c) for c in chunks]
+    )
+    for chunk, summary in zip(chunks, summaries):
+        chunk.summary = summary

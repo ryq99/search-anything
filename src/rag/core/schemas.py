@@ -23,6 +23,7 @@ class Chunk:
     parent_headings: str # ancestor headings (all but innermost)
     content_hash: str    # hex string — ties chunk back to its source document
     filename: str
+    summary: str = ""    # 1-2 sentence summary filled by summarize step
 
 
 @dataclass
@@ -33,7 +34,6 @@ class BookEntry:
     parser: str
     ingested_at: str
     chunk_count: int
-    summary_artifact_path: str = ""
 
     @property
     def registry_key(self) -> str:
@@ -47,5 +47,4 @@ class BookEntry:
             "parser": self.parser,
             "ingested_at": self.ingested_at,
             "chunk_count": self.chunk_count,
-            "summary_artifact_path": self.summary_artifact_path,
         }

@@ -6,7 +6,6 @@ from pathlib import Path
 
 from rag.core.schemas import ParseResult
 from rag.config import DATA_DIR, PARSER_ENABLE_OCR, PARSER_MIN_CONTENT_LENGTH
-from rag.parsers.heading_hierarchy import annotate_markdown_with_headings
 
 
 def _page_to_dict(page) -> dict:
@@ -92,12 +91,8 @@ class LiteParseParser:
         )
         print(f"[parser:liteparse] Saved parse result: {parse_dir / 'parse_result.json'}")
 
-        # Annotate with # markers inferred from font metadata — in memory only.
-        # converted.md preserves the raw liteparse output unchanged.
-        annotated_md = annotate_markdown_with_headings(md_text, pages_data) if pages_data else md_text
-
         return ParseResult(
-            markdown=annotated_md,
+            markdown=md_text,
             content_hash=content_hash,
             source_path=str(source),
             content_type=source.suffix.lower().lstrip("."),
