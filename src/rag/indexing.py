@@ -6,7 +6,6 @@ from rag.steps.parsing import parse_document, SUPPORTED_EXTENSIONS
 from rag.steps import chunking as chunking_step
 from rag.steps import summarize as summarize_step
 from rag.backends.factory import get_backend
-from rag.backends.local.llm import LocalLLM
 from rag.core.schemas import BookEntry
 from rag.config import BOOKS_DIR, LOCAL_PARSER
 
@@ -27,7 +26,7 @@ def ingest_source(source: Path | str) -> dict:
     chunks = chunking_step.chunk_and_enrich(parse_result)
 
     print(f"[pipeline] Summarizing {len(chunks)} chunks...")
-    asyncio.run(summarize_step.summarize_chunks(chunks, LocalLLM()))
+    asyncio.run(summarize_step.summarize_chunks(chunks, backend.summary_llm))
 
     if parse_result.doc_dir is not None:
         chunking_step.save_chunks_jsonl(chunks, parse_result.doc_dir)
