@@ -69,10 +69,10 @@ HF_TOKEN          = os.getenv("HF_TOKEN", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # --- AWS backend config ---
-AWS_REGION         = os.getenv("AWS_REGION", "us-east-1")
+AWS_REGION         = os.getenv("AWS_REGION", "us-west-2")
 S3_BUCKET          = os.getenv("S3_BUCKET", "")
 DYNAMODB_TABLE     = os.getenv("DYNAMODB_TABLE", "")
 AURORA_CONN_STRING = os.getenv("AURORA_CONN_STRING", "")
-BEDROCK_REGION     = os.getenv("BEDROCK_REGION", "us-east-1")
+BEDROCK_REGION     = os.getenv("BEDROCK_REGION", "us-west-2")
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
