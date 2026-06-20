@@ -27,7 +27,9 @@ Pull the local LLM:
 ollama pull gemma4:e4b
 ```
 
-## Indexing Pipeline
+## Pipelines
+
+### Ingestion
 
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
@@ -35,52 +37,120 @@ flowchart LR
     A("Source file
     PDF / DOCX / PPTX / MD / TXT")
 
-    subgraph B["1. Parse"]
+    subgraph PARSE["1 · Parse"]
         direction TB
-        B1("docling
+        P1("docling
         ML layout → DoclingDocument")
-        B2("liteparse
+        P2("liteparse
         Rust + OCR → markdown")
-        B3("plaintext
+        P3("plaintext
         passthrough")
     end
 
-    C("ParseResult
-    SHA-256 content hash")
+    B("ParseResult
+    markdown · content_hash · doc_dir")
 
-    subgraph D["2. Chunk"]
+    subgraph CHUNK["2 · Chunk"]
         direction TB
-        D1("DoclingChunker
+        C1("DoclingChunker
         HybridChunker on document tree
         heading ancestry + enriched_text")
-        D2("LiteParseChunker
+        C2("LiteParseChunker
         paragraph split → sentence fallback
         token-bounded greedy merge")
     end
 
-    E("Chunk objects
-    text · enriched_text · headings · summary")
+    D("list[Chunk]
+    text · enriched_text · headings")
 
-    F("3. Summarize
-    Gemma4 via Ollama — local
-    Claude Haiku via Anthropic — cloud
-    async · per chunk · stored in-place")
+    subgraph SUM["3 · Summarize"]
+        direction TB
+        S1("Gemma4 via Ollama
+        local")
+        S2("Claude Haiku
+        cloud")
+    end
 
-    G("4. Embed + Store
-    Snowflake Arctic Embed L v2.0")
+    E("Enriched Chunks
+    + summary populated per chunk")
 
-    H1("Milvus Lite
-    local")
-    H2("Bedrock KB
-    AWS")
-    I1("processed_books.json
-    local registry")
-    I2("DynamoDB
-    AWS registry")
+    A --> PARSE --> B --> CHUNK --> D --> SUM --> E
+```
 
-    A --> B --> C --> D --> E --> F --> G
-    G --> H1 & H2
-    G --> I1 & I2
+### Indexing
+
+```mermaid
+%%{init: {'look': 'handDrawn'}}%%
+flowchart LR
+    A("Enriched Chunks
+    from ingestion")
+
+    B{"Already
+    indexed?"}
+
+    SKIP(("skip"))
+
+    C("4 · Embed
+    Snowflake Arctic Embed L v2.0
+    1024-dim · COSINE metric")
+
+    subgraph STORE["5 · Store"]
+        direction TB
+        S1("Milvus Lite
+        local .db file")
+        S2("Bedrock KB
+        AWS")
+    end
+
+    subgraph REG["5 · Register"]
+        direction TB
+        R1("processed_books.json
+        local registry")
+        R2("DynamoDB
+        AWS registry")
+    end
+
+    A --> B
+    B -- "yes" --> SKIP
+    B -- "no" --> C --> STORE
+    C --> REG
+```
+
+### Inference
+
+```mermaid
+%%{init: {'look': 'handDrawn'}}%%
+flowchart LR
+    Q("Question")
+
+    R("6 · Retrieve
+    similarity search
+    top-K=10 · filter headings ≠ Contents")
+
+    subgraph VS["Vector Store"]
+        direction TB
+        V1("Milvus Lite
+        local")
+        V2("Bedrock KB
+        AWS")
+    end
+
+    F("Retrieved Chunks
+    rank · headings · summary · text")
+
+    subgraph SYN["7 · Synthesize"]
+        direction TB
+        Y1("Gemma4 via Ollama
+        local")
+        Y2("Claude Sonnet
+        cloud")
+    end
+
+    ANS("Answer")
+
+    Q --> R
+    VS --> R
+    R --> F --> SYN --> ANS
 ```
 
 ## Commands
