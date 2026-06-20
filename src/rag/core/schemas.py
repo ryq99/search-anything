@@ -8,7 +8,7 @@ class ParseResult:
     markdown: str
     content_hash: str   # SHA-256 hex string of the raw source file bytes
     source_path: str    # original file path or URL
-    content_type: str   # "pdf", "docx", "web", "notebook", etc.
+    content_type: str   # "pdf", "markdown", "text", "web", "notebook", etc.
     parser: str = ""          # parser used: "docling", "liteparse", "plaintext"
     docling_document: Any = None  # docling: structured semantic tree (DoclingDocument)
     liteparse_pages: Any = None   # liteparse: page-level data with font metadata (list[ParsedPage])

@@ -13,8 +13,8 @@ def _page_to_dict(page) -> dict:
         return dataclasses.asdict(page)
     return vars(page) if hasattr(page, "__dict__") else str(page)
 
-# File types liteparse handles natively (Rust core: PDF/Office/images)
-_LITEPARSE_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx"}
+# File types liteparse handles natively (Rust core: PDF/images)
+_LITEPARSE_EXTENSIONS = {".pdf"}
 
 
 def _stem(path: Path) -> str:

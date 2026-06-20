@@ -4,7 +4,7 @@ RAG for personal knowledge base.
 
 ## Features
 
-- **Multi-format ingestion** — PDF, DOCX, PPTX, Markdown, plain text
+- **Multi-format ingestion** — PDF, Markdown, plain text
 - **Pluggable parsers** — `docling` (ML layout model) or `liteparse` (Rust + Tesseract OCR)
 - **Structure-native chunking** — DoclingChunker operates on the live DoclingDocument tree; LiteParseChunker uses paragraph-boundary splitting with sentence-level fallback
 - **Heading-contextualized embeddings** — heading path prepended to each chunk before embedding
@@ -35,46 +35,17 @@ ollama pull gemma4:e4b
 %%{init: {'look': 'handDrawn'}}%%
 flowchart LR
     A("Source file
-    PDF / DOCX / PPTX / MD / TXT")
+    PDF / MD / TXT")
+    B("ParseResult")
+    C("list[Chunk]")
+    D("Enriched Chunks")
 
-    subgraph PARSE["1 · Parse"]
-        direction TB
-        P1("docling
-        ML layout → DoclingDocument")
-        P2("liteparse
-        Rust + OCR → markdown")
-        P3("plaintext
-        passthrough")
-    end
-
-    B("ParseResult
-    markdown · content_hash · doc_dir")
-
-    subgraph CHUNK["2 · Chunk"]
-        direction TB
-        C1("DoclingChunker
-        HybridChunker on document tree
-        heading ancestry + enriched_text")
-        C2("LiteParseChunker
-        paragraph split → sentence fallback
-        token-bounded greedy merge")
-    end
-
-    D("list[Chunk]
-    text · enriched_text · headings")
-
-    subgraph SUM["3 · Summarize"]
-        direction TB
-        S1("Gemma4 via Ollama
-        local")
-        S2("Claude Haiku
-        cloud")
-    end
-
-    E("Enriched Chunks
-    + summary populated per chunk")
-
-    A --> PARSE --> B --> CHUNK --> D --> SUM --> E
+    A -- "1 · parse
+    docling / liteparse / plaintext" --> B
+    B -- "2 · chunk
+    DoclingChunker / LiteParseChunker" --> C
+    C -- "3 · summarize
+    Gemma4 / Claude Haiku" --> D
 ```
 
 ### Indexing
@@ -82,38 +53,21 @@ flowchart LR
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
 flowchart LR
-    A("Enriched Chunks
-    from ingestion")
-
-    B{"Already
-    indexed?"}
-
+    A("Enriched Chunks")
+    B{"indexed?"}
     SKIP(("skip"))
+    V("Vectors")
+    VS[("Vector Store
+    Milvus Lite / Bedrock KB")]
+    REG[("Registry
+    JSON / DynamoDB")]
 
-    C("4 · Embed
-    Snowflake Arctic Embed L v2.0
-    1024-dim · COSINE metric")
-
-    subgraph STORE["5 · Store"]
-        direction TB
-        S1("Milvus Lite
-        local .db file")
-        S2("Bedrock KB
-        AWS")
-    end
-
-    subgraph REG["5 · Register"]
-        direction TB
-        R1("processed_books.json
-        local registry")
-        R2("DynamoDB
-        AWS registry")
-    end
-
-    A --> B
+    A -- "check hash" --> B
     B -- "yes" --> SKIP
-    B -- "no" --> C --> STORE
-    C --> REG
+    B -- "4 · embed
+    Arctic Embed L v2 / Titan Text Embed v2" --> V
+    V -- "5 · store" --> VS
+    V -- "5 · register" --> REG
 ```
 
 ### Inference
@@ -122,35 +76,18 @@ flowchart LR
 %%{init: {'look': 'handDrawn'}}%%
 flowchart LR
     Q("Question")
-
-    R("6 · Retrieve
-    similarity search
-    top-K=10 · filter headings ≠ Contents")
-
-    subgraph VS["Vector Store"]
-        direction TB
-        V1("Milvus Lite
-        local")
-        V2("Bedrock KB
-        AWS")
-    end
-
-    F("Retrieved Chunks
-    rank · headings · summary · text")
-
-    subgraph SYN["7 · Synthesize"]
-        direction TB
-        Y1("Gemma4 via Ollama
-        local")
-        Y2("Claude Sonnet
-        cloud")
-    end
-
+    QV("Query Vector")
+    VS[("Vector Store")]
+    R("Retrieved Chunks")
     ANS("Answer")
 
-    Q --> R
-    VS --> R
-    R --> F --> SYN --> ANS
+    Q -- "6 · embed
+    Arctic Embed L v2 / Titan Text Embed v2" --> QV
+    QV -.-> VS
+    VS -- "7 · retrieve
+    top-K · metadata filters" --> R
+    R -- "8 · synthesize
+    Gemma4 / Claude Sonnet" --> ANS
 ```
 
 ## Commands

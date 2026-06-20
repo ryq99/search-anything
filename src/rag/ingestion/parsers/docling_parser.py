@@ -59,7 +59,7 @@ def _clean_markdown(md_text: str) -> str:
 
 
 class DoclingParser:
-    """Parses PDF, DOCX, and PPTX files to markdown via docling (ML layout model)."""
+    """Parses PDF files to markdown via docling (ML layout model)."""
 
     def __init__(self) -> None:
         self._converter = _build_converter()
