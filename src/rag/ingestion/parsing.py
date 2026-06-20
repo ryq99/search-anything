@@ -10,7 +10,7 @@ from pathlib import Path
 from rag.core.schemas import ParseResult
 from rag.config import LOCAL_PARSER
 
-_DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".pptx"}
+_DOCUMENT_EXTENSIONS = {".pdf"}
 _PASSTHROUGH_EXTENSIONS = {".md", ".txt"}
 SUPPORTED_EXTENSIONS = _DOCUMENT_EXTENSIONS | _PASSTHROUGH_EXTENSIONS
 
@@ -28,19 +28,19 @@ def detect_content_type(source: Path | str) -> str:
     if source_str.startswith(("http://", "https://")):
         return "youtube" if ("youtube.com" in source_str or "youtu.be" in source_str) else "web"
     return {
-        ".pdf": "pdf", ".docx": "docx", ".pptx": "pptx",
+        ".pdf": "pdf",
         ".ipynb": "notebook", ".md": "markdown", ".txt": "text",
     }.get(Path(source).suffix.lower(), "unknown")
 
 
 def parse_document(source: Path | str) -> ParseResult:
     content_type = detect_content_type(source)
-    if content_type in ("pdf", "docx", "pptx"):
+    if content_type == "pdf":
         return _get_document_parser().parse(source)
     if content_type in ("markdown", "text"):
         from rag.ingestion.parsers.plaintext_parser import PlaintextParser
         return PlaintextParser().parse(source)
     raise NotImplementedError(
         f"No parser for content type '{content_type}'. "
-        f"Supported: pdf, docx, pptx, markdown, text. Coming soon: web, notebook, youtube."
+        f"Supported: pdf, markdown, text. Coming soon: docx, pptx, web, notebook, youtube."
     )

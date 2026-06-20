@@ -4,7 +4,7 @@ RAG for personal knowledge base.
 
 ## Features
 
-- **Multi-format ingestion** — PDF, DOCX, PPTX, Markdown, plain text
+- **Multi-format ingestion** — PDF, Markdown, plain text
 - **Pluggable parsers** — `docling` (ML layout model) or `liteparse` (Rust + Tesseract OCR)
 - **Structure-native chunking** — DoclingChunker operates on the live DoclingDocument tree; LiteParseChunker uses paragraph-boundary splitting with sentence-level fallback
 - **Heading-contextualized embeddings** — heading path prepended to each chunk before embedding
@@ -27,60 +27,67 @@ Pull the local LLM:
 ollama pull gemma4:e4b
 ```
 
-## Indexing Pipeline
+## Pipelines
+
+### Ingestion
 
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
 flowchart LR
     A("Source file
-    PDF / DOCX / PPTX / MD / TXT")
+    PDF / MD / TXT")
+    B("ParseResult")
+    C("list[Chunk]")
+    D("Enriched Chunks")
 
-    subgraph B["1. Parse"]
-        direction TB
-        B1("docling
-        ML layout → DoclingDocument")
-        B2("liteparse
-        Rust + OCR → markdown")
-        B3("plaintext
-        passthrough")
-    end
+    A -- "1 · parse
+    docling / liteparse / plaintext" --> B
+    B -- "2 · chunk
+    DoclingChunker / LiteParseChunker" --> C
+    C -- "3 · summarize
+    Gemma4 / Claude Haiku" --> D
+```
 
-    C("ParseResult
-    SHA-256 content hash")
+### Indexing
 
-    subgraph D["2. Chunk"]
-        direction TB
-        D1("DoclingChunker
-        HybridChunker on document tree
-        heading ancestry + enriched_text")
-        D2("LiteParseChunker
-        paragraph split → sentence fallback
-        token-bounded greedy merge")
-    end
+```mermaid
+%%{init: {'look': 'handDrawn'}}%%
+flowchart LR
+    A("Enriched Chunks")
+    B{"indexed?"}
+    SKIP(("skip"))
+    V("Vectors")
+    VS[("Vector Store
+    Milvus Lite / Bedrock KB")]
+    REG[("Registry
+    JSON / DynamoDB")]
 
-    E("Chunk objects
-    text · enriched_text · headings · summary")
+    A -- "check hash" --> B
+    B -- "yes" --> SKIP
+    B -- "4 · embed
+    Arctic Embed L v2 / Titan Text Embed v2" --> V
+    V -- "5 · store" --> VS
+    V -- "5 · register" --> REG
+```
 
-    F("3. Summarize
-    Gemma4 via Ollama — local
-    Claude Haiku via Anthropic — cloud
-    async · per chunk · stored in-place")
+### Inference
 
-    G("4. Embed + Store
-    Snowflake Arctic Embed L v2.0")
+```mermaid
+%%{init: {'look': 'handDrawn'}}%%
+flowchart LR
+    Q("Question")
+    QV("Query Vector")
+    VS[("Vector Store")]
+    R("Retrieved Chunks")
+    ANS("Answer")
 
-    H1("Milvus Lite
-    local")
-    H2("Bedrock KB
-    AWS")
-    I1("processed_books.json
-    local registry")
-    I2("DynamoDB
-    AWS registry")
-
-    A --> B --> C --> D --> E --> F --> G
-    G --> H1 & H2
-    G --> I1 & I2
+    Q -- "6 · embed
+    Arctic Embed L v2 / Titan Text Embed v2" --> QV
+    QV -.-> VS
+    VS -- "7 · retrieve
+    top-K · metadata filters" --> R
+    R -- "8 · synthesize
+    Gemma4 / Claude Sonnet" --> ANS
 ```
 
 ## Commands
