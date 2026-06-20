@@ -2,7 +2,7 @@
 Parsing step: the ingestion boundary of the pipeline.
 
 Owns orchestration only — detects content type and routes to the appropriate
-parser plugin in rag/parsers/. Each parser is responsible for its own artifact
+parser plugin in rag/ingestion/parsers/. Each parser is responsible for its own artifact
 saving and returns a ParseResult.
 """
 from pathlib import Path
@@ -17,9 +17,9 @@ SUPPORTED_EXTENSIONS = _DOCUMENT_EXTENSIONS | _PASSTHROUGH_EXTENSIONS
 
 def _get_document_parser():
     if LOCAL_PARSER == "liteparse":
-        from rag.parsers.liteparse_parser import LiteParseParser
+        from rag.ingestion.parsers.liteparse_parser import LiteParseParser
         return LiteParseParser()
-    from rag.parsers.docling_parser import DoclingParser
+    from rag.ingestion.parsers.docling_parser import DoclingParser
     return DoclingParser()
 
 
@@ -38,7 +38,7 @@ def parse_document(source: Path | str) -> ParseResult:
     if content_type in ("pdf", "docx", "pptx"):
         return _get_document_parser().parse(source)
     if content_type in ("markdown", "text"):
-        from rag.parsers.plaintext_parser import PlaintextParser
+        from rag.ingestion.parsers.plaintext_parser import PlaintextParser
         return PlaintextParser().parse(source)
     raise NotImplementedError(
         f"No parser for content type '{content_type}'. "

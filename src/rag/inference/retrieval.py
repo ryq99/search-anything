@@ -1,5 +1,5 @@
 from rag.config import RETRIEVAL_K, RETRIEVAL_EXPR
-from rag.synthesis import ask as _synthesize
+from rag.inference.synthesis import ask as _synthesize
 
 
 def _get_vectorstore():

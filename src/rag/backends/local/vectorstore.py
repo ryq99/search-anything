@@ -5,7 +5,21 @@ from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 from langchain_milvus import Milvus
 
 from rag.core.schemas import Chunk
-from rag.config import EMBED_MODEL_ID, VECTOR_STORE_NAME, MILVUS_URI, VECTOR_STORE_DIR
+from rag.config import (
+    EMBED_MODEL_ID, VECTOR_STORE_NAME, MILVUS_URI, VECTOR_STORE_DIR,
+    MILVUS_INDEX_TYPE, MILVUS_METRIC_TYPE,
+    MILVUS_HNSW_M, MILVUS_HNSW_EF_CONSTRUCTION,
+    MILVUS_IVF_NLIST,
+)
+
+
+def _build_index_params() -> dict:
+    params: dict = {"index_type": MILVUS_INDEX_TYPE, "metric_type": MILVUS_METRIC_TYPE}
+    if MILVUS_INDEX_TYPE == "HNSW":
+        params["params"] = {"M": MILVUS_HNSW_M, "efConstruction": MILVUS_HNSW_EF_CONSTRUCTION}
+    elif MILVUS_INDEX_TYPE.startswith("IVF"):
+        params["params"] = {"nlist": MILVUS_IVF_NLIST}
+    return params
 
 
 class MilvusVectorStore:
@@ -28,7 +42,7 @@ class MilvusVectorStore:
                 embedding=self._embedding,
                 collection_name=VECTOR_STORE_NAME,
                 connection_args={"uri": MILVUS_URI},
-                index_params={"index_type": "FLAT"},
+                index_params=_build_index_params(),
             )
         else:
             print("[vectorstore] Adding to existing Milvus collection...")
@@ -42,7 +56,7 @@ class MilvusVectorStore:
             embedding_function=self._embedding,
             collection_name=VECTOR_STORE_NAME,
             connection_args={"uri": MILVUS_URI},
-            index_params={"index_type": "FLAT"},
+            index_params=_build_index_params(),
         )
 
     @staticmethod

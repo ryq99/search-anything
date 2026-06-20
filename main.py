@@ -1,8 +1,8 @@
 import argparse
 from pathlib import Path
 
-from rag.retrieval import ask
-from rag.indexing import ingest_source, ingest_directory, start_watcher
+from rag.inference.retrieval import ask
+from rag.indexing.pipeline import ingest_source, ingest_directory, start_watcher
 from rag.config import BOOKS_DIR
 
 

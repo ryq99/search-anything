@@ -2,7 +2,7 @@
 Chunking step: splits a parsed document into embeddable chunks and enriches
 each with heading ancestry.
 
-Orchestration only — selects the configured chunker from rag.chunkers and
+Orchestration only — selects the configured chunker from rag/ingestion/chunkers/ and
 routes the ParseResult to it. Adding a strategy = drop a file in chunkers/
 and add one dispatch line in _get_chunker().
 """
@@ -16,9 +16,9 @@ from rag.config import LOCAL_CHUNKER
 
 def _get_chunker():
     if LOCAL_CHUNKER == "docling":
-        from rag.chunkers.docling_chunker import DoclingChunker
+        from rag.ingestion.chunkers.docling_chunker import DoclingChunker
         return DoclingChunker()
-    from rag.chunkers.liteparse_chunker import LiteParseChunker
+    from rag.ingestion.chunkers.liteparse_chunker import LiteParseChunker
     return LiteParseChunker()
 
 
