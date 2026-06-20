@@ -23,8 +23,6 @@ LOCAL_PARSER = os.getenv("LOCAL_PARSER", "liteparse")  # "liteparse" | "docling"
 PARSER_ENABLE_OCR = os.getenv("PARSER_ENABLE_OCR", "true").lower() == "true"
 # Below this many chars, a parse is treated as a likely scanned/empty doc.
 PARSER_MIN_CONTENT_LENGTH = 500
-# VLM image description (figures/diagrams). Slow + needs a VLM endpoint; later step.
-PARSER_ENABLE_IMAGE_DESCRIPTION = False
 
 # --- Chunking ---
 LOCAL_CHUNKER    = os.getenv("LOCAL_CHUNKER", "liteparse")  # "liteparse" | "docling"
@@ -94,10 +92,9 @@ HF_TOKEN          = os.getenv("HF_TOKEN", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # --- AWS backend ---
-AWS_REGION         = os.getenv("AWS_REGION", "us-west-2")
-S3_BUCKET          = os.getenv("S3_BUCKET", "")
-DYNAMODB_TABLE     = os.getenv("DYNAMODB_TABLE", "")
-AURORA_CONN_STRING = os.getenv("AURORA_CONN_STRING", "")
-BEDROCK_REGION     = os.getenv("BEDROCK_REGION", "us-west-2")
+AWS_REGION     = os.getenv("AWS_REGION", "us-west-2")
+S3_BUCKET      = os.getenv("S3_BUCKET", "")
+DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE", "")
+BEDROCK_REGION = os.getenv("BEDROCK_REGION", "us-west-2")
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
