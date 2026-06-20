@@ -2,16 +2,31 @@ import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
-from rag.steps.parsing import parse_document, SUPPORTED_EXTENSIONS
-from rag.steps import chunking as chunking_step
-from rag.steps import summarize as summarize_step
+from rag.ingestion.parsing import parse_document, SUPPORTED_EXTENSIONS
+from rag.ingestion.chunking import chunk_and_enrich, save_chunks_jsonl
+from rag.ingestion.summarize import summarize_chunks
 from rag.backends.factory import get_backend
 from rag.core.schemas import BookEntry
 from rag.config import BOOKS_DIR, LOCAL_PARSER
 
 
+def build(parse_result, chunks, backend) -> BookEntry:
+    """Embed, store, and register chunks. Returns the BookEntry."""
+    backend.vectorstore.store(chunks)
+    entry = BookEntry(
+        filename=Path(parse_result.source_path).name,
+        source_path=parse_result.source_path,
+        content_hash=parse_result.content_hash,
+        parser=parse_result.parser,
+        ingested_at=datetime.now(timezone.utc).isoformat(),
+        chunk_count=len(chunks),
+    )
+    backend.registry.register(entry)
+    return entry
+
+
 def ingest_source(source: Path | str) -> dict:
-    """Full ingestion pipeline for a single source. Idempotent."""
+    """Full pipeline for a single source. Idempotent."""
     backend = get_backend()
     source = Path(source)
 
@@ -23,26 +38,16 @@ def ingest_source(source: Path | str) -> dict:
         return backend.registry.get(parse_result.content_hash, parse_result.parser)
 
     print("[pipeline] Chunking and enriching...")
-    chunks = chunking_step.chunk_and_enrich(parse_result)
+    chunks = chunk_and_enrich(parse_result)
 
     print(f"[pipeline] Summarizing {len(chunks)} chunks...")
-    asyncio.run(summarize_step.summarize_chunks(chunks, backend.summary_llm))
+    asyncio.run(summarize_chunks(chunks, backend.summary_llm))
 
     if parse_result.doc_dir is not None:
-        chunking_step.save_chunks_jsonl(chunks, parse_result.doc_dir)
+        save_chunks_jsonl(chunks, parse_result.doc_dir)
 
     print(f"[pipeline] Embedding and storing {len(chunks)} chunks...")
-    backend.vectorstore.store(chunks)
-
-    entry = BookEntry(
-        filename=source.name,
-        source_path=str(source.absolute()),
-        content_hash=parse_result.content_hash,
-        parser=parse_result.parser,
-        ingested_at=datetime.now(timezone.utc).isoformat(),
-        chunk_count=len(chunks),
-    )
-    backend.registry.register(entry)
+    entry = build(parse_result, chunks, backend)
 
     print(f"[pipeline] Done: {source.name} ({len(chunks)} chunks)")
     return entry.to_dict()
@@ -103,7 +108,6 @@ def start_watcher(books_dir: Path | None = None) -> None:
     print(f"[watcher] Watching {books_dir}. Press Ctrl+C to stop.")
     try:
         while True:
-            import time
             time.sleep(1)
     except KeyboardInterrupt:
         observer.stop()
