@@ -7,9 +7,10 @@ from rag.ingestion.summarize import summarize_chunks
 from rag.core.schemas import ParseResult, Chunk
 
 
-def run(source: Path | str, summary_llm) -> tuple[ParseResult, list[Chunk]]:
+def run(source: Path | str, summary_llm, parse_result: ParseResult | None = None) -> tuple[ParseResult, list[Chunk]]:
     """Parse, chunk, and summarize a single source. Returns (ParseResult, list[Chunk])."""
-    parse_result = parse_document(Path(source))
+    if parse_result is None:
+        parse_result = parse_document(Path(source))
     chunks = chunk_and_enrich(parse_result)
     asyncio.run(summarize_chunks(chunks, summary_llm))
     if parse_result.doc_dir is not None:
