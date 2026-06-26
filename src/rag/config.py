@@ -4,10 +4,10 @@ import os
 
 load_dotenv()
 
-# --- Backend switch ---
+# ── Backend ────────────────────────────────────────────────────────────────
 CLOUD_BACKEND = os.getenv("CLOUD_BACKEND", "local")  # "local" | "aws"
 
-# --- Paths (local mode) ---
+# ── Paths (local mode) ─────────────────────────────────────────────────────
 # config.py lives at src/rag/config.py, so three .parent hops reach the repo root
 # (config.py -> rag -> src -> repo root) where books/, data/, vector_store/ live.
 PROJECT_ROOT         = Path(__file__).parent.parent.parent
@@ -19,13 +19,13 @@ PROCESSED_BOOKS_PATH = PROJECT_ROOT / "processed_books.json"
 # ── Ingestion ────────────────────────────────────────────────────────────────
 
 # --- Parsing ---
-LOCAL_PARSER = os.getenv("LOCAL_PARSER", "liteparse")  # "liteparse" | "docling"
+LOCAL_PARSER = os.getenv("LOCAL_PARSER", "docling")  # "liteparse" | "docling"
 PARSER_ENABLE_OCR = os.getenv("PARSER_ENABLE_OCR", "true").lower() == "true"
 # Below this many chars, a parse is treated as a likely scanned/empty doc.
 PARSER_MIN_CONTENT_LENGTH = 500
 
 # --- Chunking ---
-LOCAL_CHUNKER    = os.getenv("LOCAL_CHUNKER", "liteparse")  # "liteparse" | "docling"
+LOCAL_CHUNKER    = os.getenv("LOCAL_CHUNKER", "docling")  # "liteparse" | "docling"
 # Tokenizer that drives token counting + the model's max sequence length. Keep
 # this equal to the embedding model so chunk sizes match what actually gets embedded.
 CHUNK_TOKENIZER  = os.getenv("CHUNK_TOKENIZER", "Snowflake/snowflake-arctic-embed-l-v2.0")
