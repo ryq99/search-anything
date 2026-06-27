@@ -1,6 +1,9 @@
-from pathlib import Path
-from dotenv import load_dotenv
+import hashlib
+import json
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -39,12 +42,34 @@ CHUNK_MERGE_PEERS = os.getenv("CHUNK_MERGE_PEERS", "true").lower() == "true"
 # True = a bullet list stays together; False = each item is its own chunk.
 CHUNK_MERGE_LIST_ITEMS = os.getenv("CHUNK_MERGE_LIST_ITEMS", "true").lower() == "true"
 
+# ── Pipeline config hash ──────────────────────────────────────────────────────
+# Uniquely identifies a full ingestion pipeline configuration — every method
+# decision that affects the stored artifact (parse → chunk → summarize → embed).
+# Changing any of these parameters produces a new hash, a new registry namespace,
+# and a new vector store partition, so stale artifacts are never silently reused.
+_pipeline_config = {
+    "parser":                LOCAL_PARSER,
+    "parser_ocr":            PARSER_ENABLE_OCR,
+    "chunker":               LOCAL_CHUNKER,
+    "chunk_tokenizer":       CHUNK_TOKENIZER,
+    "chunk_max_tokens":      CHUNK_MAX_TOKENS,
+    "chunk_merge_peers":     CHUNK_MERGE_PEERS,
+    "chunk_merge_list_items": CHUNK_MERGE_LIST_ITEMS,
+    "embed_model":           "Snowflake/snowflake-arctic-embed-l-v2.0",
+    "summary_model":         os.getenv("LOCAL_SUMMARY_MODEL", "gemma4:e4b")
+                             if CLOUD_BACKEND == "local"
+                             else os.getenv("CLOUD_SUMMARY_MODEL", "claude-haiku-4-5-20251001"),
+}
+PIPELINE_CONFIG_HASH = hashlib.sha256(
+    json.dumps(_pipeline_config, sort_keys=True).encode()
+).hexdigest()[:12]
+
 # ── Indexing ─────────────────────────────────────────────────────────────────
 
 # --- Embedding ---
 EMBED_MODEL_ID    = "Snowflake/snowflake-arctic-embed-l-v2.0"
-VECTOR_STORE_NAME = "book_a_snowflake_arctic_embed"
-MILVUS_URI        = str(VECTOR_STORE_DIR / f"{VECTOR_STORE_NAME}.db")
+VECTOR_STORE_NAME = f"rag_{PIPELINE_CONFIG_HASH}"
+MILVUS_URI        = str(VECTOR_STORE_DIR / f"{PIPELINE_CONFIG_HASH}.db")
 
 # --- Summarization ---
 # Chunk summarization runs at indexing time to enrich each chunk before storage.
