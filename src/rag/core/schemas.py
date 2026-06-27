@@ -31,8 +31,8 @@ class BookEntry:
     filename: str
     source_path: str
     content_hash: str
-    parser: str
     pipeline_config_hash: str  # fingerprint of all method decisions (parse→chunk→summarize→embed)
+    parser: str
     ingested_at: str
     chunk_count: int
 
