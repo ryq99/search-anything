@@ -32,12 +32,13 @@ class BookEntry:
     source_path: str
     content_hash: str
     parser: str
+    pipeline_config_hash: str  # fingerprint of all method decisions (parse→chunk→summarize→embed)
     ingested_at: str
     chunk_count: int
 
     @property
     def registry_key(self) -> str:
-        return f"{self.content_hash}_{self.parser}"
+        return f"{self.content_hash}_{self.pipeline_config_hash}"
 
     def to_dict(self) -> dict:
         return {
@@ -45,6 +46,7 @@ class BookEntry:
             "source_path": self.source_path,
             "content_hash": self.content_hash,
             "parser": self.parser,
+            "pipeline_config_hash": self.pipeline_config_hash,
             "ingested_at": self.ingested_at,
             "chunk_count": self.chunk_count,
         }
