@@ -7,7 +7,7 @@ from rag.ingestion.pipeline import run as ingest_run
 from rag.indexing.store import build
 from rag.inference.retrieval import ask
 from rag.backends.factory import get_backend
-from rag.config import BOOKS_DIR, LOCAL_PARSER
+from rag.config import BOOKS_DIR, PIPELINE_CONFIG_HASH
 
 
 def index_source(source: Path | str) -> dict:
@@ -18,9 +18,9 @@ def index_source(source: Path | str) -> dict:
     print(f"[pipeline] Parsing {source.name}...")
     parse_result = parse_document(source)
 
-    if backend.registry.is_ingested(parse_result.content_hash, parse_result.parser):
-        print(f"[pipeline] Already indexed: {source.name} ({parse_result.parser}, hash={parse_result.content_hash[:10]}...)")
-        return backend.registry.get(parse_result.content_hash, parse_result.parser)
+    if backend.registry.is_ingested(parse_result.content_hash, PIPELINE_CONFIG_HASH):
+        print(f"[pipeline] Already indexed: {source.name} (config={PIPELINE_CONFIG_HASH}, hash={parse_result.content_hash[:10]}...)")
+        return backend.registry.get(parse_result.content_hash, PIPELINE_CONFIG_HASH)
 
     print("[pipeline] Chunking, enriching, and summarizing...")
     parse_result, chunks = ingest_run(source, backend.summary_llm, parse_result=parse_result)
@@ -44,11 +44,11 @@ def ingest_directory(directory: Path | None = None) -> list[dict]:
         if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
             continue
         already = any(
-            e.get("filename") == path.name and e.get("parser") == LOCAL_PARSER
+            e.get("filename") == path.name and e.get("pipeline_config_hash") == PIPELINE_CONFIG_HASH
             for e in all_entries.values()
         )
         if already:
-            print(f"[pipeline] Skipping (already indexed with {LOCAL_PARSER}): {path.name}")
+            print(f"[pipeline] Skipping (already indexed, config={PIPELINE_CONFIG_HASH}): {path.name}")
             continue
         results.append(index_source(path))
     return results
