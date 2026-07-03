@@ -55,7 +55,9 @@ _pipeline_config = {
     "chunk_max_tokens":      CHUNK_MAX_TOKENS,
     "chunk_merge_peers":     CHUNK_MERGE_PEERS,
     "chunk_merge_list_items": CHUNK_MERGE_LIST_ITEMS,
-    "embed_model":           "Snowflake/snowflake-arctic-embed-l-v2.0",
+    "embed_model":           "Snowflake/snowflake-arctic-embed-l-v2.0"
+                             if CLOUD_BACKEND == "local"
+                             else os.getenv("BEDROCK_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0"),
     "summary_model":         os.getenv("LOCAL_SUMMARY_MODEL", "gemma4:e4b")
                              if CLOUD_BACKEND == "local"
                              else os.getenv("CLOUD_SUMMARY_MODEL", "claude-haiku-4-5-20251001"),
@@ -75,7 +77,7 @@ MILVUS_URI        = str(VECTOR_STORE_DIR / f"{PIPELINE_CONFIG_HASH}.db")
 # Chunk summarization runs at indexing time to enrich each chunk before storage.
 LOCAL_LLM_BASE_URL  = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434")
 LOCAL_SUMMARY_MODEL = os.getenv("LOCAL_SUMMARY_MODEL", "gemma4:e4b")
-CLOUD_SUMMARY_MODEL = os.getenv("CLOUD_SUMMARY_MODEL", "claude-haiku-4-5-20251001")
+CLOUD_SUMMARY_MODEL = os.getenv("CLOUD_SUMMARY_MODEL", "us.anthropic.claude-haiku-4-5-20251001")
 SUMMARY_SEMAPHORE   = 5
 SUMMARY_MAX_TOKENS  = 1000
 
@@ -107,7 +109,7 @@ RETRIEVAL_EXPR = os.getenv("RETRIEVAL_EXPR", "headings != 'Contents'")
 # --- Synthesis ---
 # Answer synthesis runs at query time to generate the final response.
 LOCAL_SYNTHESIS_MODEL  = os.getenv("LOCAL_SYNTHESIS_MODEL", "gemma4:e4b")
-CLOUD_SYNTHESIS_MODEL  = os.getenv("CLOUD_SYNTHESIS_MODEL", "claude-sonnet-4-6")
+CLOUD_SYNTHESIS_MODEL  = os.getenv("CLOUD_SYNTHESIS_MODEL", "us.anthropic.claude-sonnet-4-6-20250514")
 SYNTHESIS_MAX_TOKENS   = 8192
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
@@ -117,9 +119,12 @@ HF_TOKEN          = os.getenv("HF_TOKEN", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # --- AWS backend ---
-AWS_REGION     = os.getenv("AWS_REGION", "us-west-2")
-S3_BUCKET      = os.getenv("S3_BUCKET", "")
-DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE", "")
-BEDROCK_REGION = os.getenv("BEDROCK_REGION", "us-west-2")
+AWS_REGION                = os.getenv("AWS_REGION", "us-west-2")
+S3_BUCKET                 = os.getenv("S3_BUCKET", "")
+DYNAMODB_TABLE            = os.getenv("DYNAMODB_TABLE", "")
+BEDROCK_REGION            = os.getenv("BEDROCK_REGION", "us-west-2")
+BEDROCK_KNOWLEDGE_BASE_ID = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "")
+BEDROCK_DATA_SOURCE_ID    = os.getenv("BEDROCK_DATA_SOURCE_ID", "")
+BEDROCK_EMBED_MODEL_ID    = os.getenv("BEDROCK_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
