@@ -20,12 +20,12 @@ def get_backend() -> Backend:
     if CLOUD_BACKEND == "aws":
         from rag.backends.aws.registry import DynamoDBRegistry
         from rag.backends.aws.vectorstore import BedrockKBVectorStore
-        from rag.backends.local.llm import AnthropicLLM
+        from rag.backends.aws.llm import BedrockLLM
         return Backend(
             registry=DynamoDBRegistry(),
             vectorstore=BedrockKBVectorStore(),
-            summary_llm=AnthropicLLM(CLOUD_SUMMARY_MODEL),
-            synthesis_llm=AnthropicLLM(CLOUD_SYNTHESIS_MODEL),
+            summary_llm=BedrockLLM(CLOUD_SUMMARY_MODEL),
+            synthesis_llm=BedrockLLM(CLOUD_SYNTHESIS_MODEL),
         )
 
     from rag.backends.local.registry import JsonRegistry
