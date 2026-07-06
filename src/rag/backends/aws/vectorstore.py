@@ -1,4 +1,5 @@
 import json
+import time
 
 import boto3
 from langchain_core.documents import Document
@@ -8,6 +9,7 @@ from rag.config import (
     AWS_REGION, BEDROCK_REGION,
     S3_BUCKET, BEDROCK_KNOWLEDGE_BASE_ID, BEDROCK_DATA_SOURCE_ID,
     PIPELINE_CONFIG_HASH,
+    KB_SYNC_POLL_INTERVAL, KB_SYNC_TIMEOUT,
 )
 
 
@@ -45,11 +47,38 @@ class BedrockKBVectorStore:
                 Key=key + ".metadata.json",
                 Body=json.dumps(meta).encode(),
             )
-        self._agent.start_ingestion_job(
+        job = self._agent.start_ingestion_job(
             knowledgeBaseId=BEDROCK_KNOWLEDGE_BASE_ID,
             dataSourceId=BEDROCK_DATA_SOURCE_ID,
         )
-        print("[vectorstore] KB ingestion job started — chunks searchable once sync completes.")
+        job_id = job["ingestionJob"]["ingestionJobId"]
+        print(f"[vectorstore] KB ingestion job {job_id} started — waiting for sync...")
+        self._wait_for_sync(job_id)
+        print(f"[vectorstore] KB sync complete — {len(chunks)} chunks searchable.")
+
+    def _wait_for_sync(self, job_id: str) -> None:
+        """Block until the KB ingestion job reaches a terminal state.
+
+        Raises on FAILED or timeout so the caller never registers a false success —
+        build() runs store() before registry.register(), so a raise here leaves the
+        document un-ingested for the next run.
+        """
+        deadline = time.time() + KB_SYNC_TIMEOUT
+        while time.time() < deadline:
+            resp = self._agent.get_ingestion_job(
+                knowledgeBaseId=BEDROCK_KNOWLEDGE_BASE_ID,
+                dataSourceId=BEDROCK_DATA_SOURCE_ID,
+                ingestionJobId=job_id,
+            )
+            status = resp["ingestionJob"]["status"]
+            if status == "COMPLETE":
+                return
+            if status == "FAILED":
+                reasons = resp["ingestionJob"].get("failureReasons", [])
+                raise RuntimeError(f"Bedrock KB ingestion job {job_id} FAILED: {reasons}")
+            print(f"[vectorstore] KB sync status: {status}")
+            time.sleep(KB_SYNC_POLL_INTERVAL)
+        raise TimeoutError(f"KB ingestion job {job_id} did not complete within {KB_SYNC_TIMEOUT}s")
 
     def get_store(self) -> "_BedrockKBStore":
         return _BedrockKBStore(self._runtime)
