@@ -127,4 +127,8 @@ BEDROCK_KNOWLEDGE_BASE_ID = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "")
 BEDROCK_DATA_SOURCE_ID    = os.getenv("BEDROCK_DATA_SOURCE_ID", "")
 BEDROCK_EMBED_MODEL_ID    = os.getenv("BEDROCK_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")
 
+# KB ingestion job sync polling — store() blocks until the job reaches a terminal state.
+KB_SYNC_POLL_INTERVAL     = int(os.getenv("KB_SYNC_POLL_INTERVAL", "5"))    # seconds between status checks
+KB_SYNC_TIMEOUT           = int(os.getenv("KB_SYNC_TIMEOUT", "600"))        # max wait before giving up
+
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
