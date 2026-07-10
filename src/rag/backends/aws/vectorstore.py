@@ -10,6 +10,7 @@ from rag.config import (
     S3_BUCKET, BEDROCK_KNOWLEDGE_BASE_ID, BEDROCK_DATA_SOURCE_ID,
     PIPELINE_CONFIG_HASH,
     KB_SYNC_POLL_INTERVAL, KB_SYNC_TIMEOUT,
+    RETRIEVAL_EXCLUDE_HEADINGS,
 )
 
 
@@ -91,25 +92,31 @@ class _BedrockKBStore:
         self._runtime = runtime
 
     def similarity_search(self, query: str, k: int, expr: str = None) -> list[Document]:
-        # expr is Milvus-style syntax — not supported by Bedrock KB; ignored here.
-        # Use BEDROCK_RETRIEVAL_FILTER env var for AWS-native metadata filtering if needed.
+        # Bedrock KB has no Milvus-style expr filter (expr is ignored). Over-fetch,
+        # then drop excluded headings client-side — mirrors the local backend's
+        # RETRIEVAL_EXPR "headings != 'Contents'". 100 is Bedrock's max numberOfResults.
         resp = self._runtime.retrieve(
             knowledgeBaseId=BEDROCK_KNOWLEDGE_BASE_ID,
             retrievalQuery={"text": query},
             retrievalConfiguration={
-                "vectorSearchConfiguration": {"numberOfResults": k},
+                "vectorSearchConfiguration": {"numberOfResults": min(k * 2, 100)},
             },
         )
-        return [
-            Document(
+        docs = []
+        for r in resp["retrievalResults"]:
+            meta = r["metadata"]
+            if meta.get("headings", "") in RETRIEVAL_EXCLUDE_HEADINGS:
+                continue
+            docs.append(Document(
                 page_content=r["content"]["text"],
                 metadata={
-                    "raw_text":        r["metadata"].get("raw_text", ""),
-                    "headings":        r["metadata"].get("headings", ""),
-                    "parent_headings": r["metadata"].get("parent_headings", ""),
-                    "summary":         r["metadata"].get("summary", ""),
-                    "filename":        r["metadata"].get("filename", ""),
+                    "raw_text":        meta.get("raw_text", ""),
+                    "headings":        meta.get("headings", ""),
+                    "parent_headings": meta.get("parent_headings", ""),
+                    "summary":         meta.get("summary", ""),
+                    "filename":        meta.get("filename", ""),
                 },
-            )
-            for r in resp["retrievalResults"]
-        ]
+            ))
+            if len(docs) == k:
+                break
+        return docs

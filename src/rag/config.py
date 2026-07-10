@@ -105,6 +105,11 @@ MILVUS_IVF_NLIST = int(os.getenv("MILVUS_IVF_NLIST", "128"))
 # --- Retrieval ---
 RETRIEVAL_K    = int(os.getenv("RETRIEVAL_K", "10"))
 RETRIEVAL_EXPR = os.getenv("RETRIEVAL_EXPR", "headings != 'Contents'")
+# AWS KB retrieval has no native Milvus-style expr filter; this drives a
+# client-side post-filter that mirrors RETRIEVAL_EXPR's "headings != 'Contents'".
+RETRIEVAL_EXCLUDE_HEADINGS = {
+    h.strip() for h in os.getenv("RETRIEVAL_EXCLUDE_HEADINGS", "Contents").split(",") if h.strip()
+}
 
 # --- Synthesis ---
 # Answer synthesis runs at query time to generate the final response.
