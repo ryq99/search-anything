@@ -32,6 +32,7 @@ class BedrockKBVectorStore:
         self._runtime = boto3.client("bedrock-agent-runtime", region_name=BEDROCK_REGION)
 
     def store(self, chunks: list[Chunk]) -> None:
+        total = len(chunks)
         for i, chunk in enumerate(chunks):
             key = f"chunks/{PIPELINE_CONFIG_HASH}/{chunk.content_hash}_{i}.txt"
             self._s3.put_object(Bucket=S3_BUCKET, Key=key, Body=chunk.enriched_text.encode())
@@ -42,6 +43,8 @@ class BedrockKBVectorStore:
                 "summary":             chunk.summary,
                 "filename":            chunk.filename,
                 "pipeline_config_hash": PIPELINE_CONFIG_HASH,
+                "chunk_index":         i,       # position in document (reading order)
+                "total_chunks":        total,   # for "chunk i of N" completeness
             }}
             self._s3.put_object(
                 Bucket=S3_BUCKET,
@@ -115,6 +118,8 @@ class _BedrockKBStore:
                     "parent_headings": meta.get("parent_headings", ""),
                     "summary":         meta.get("summary", ""),
                     "filename":        meta.get("filename", ""),
+                    "chunk_index":     meta.get("chunk_index", -1),
+                    "total_chunks":    meta.get("total_chunks", -1),
                 },
             ))
             if len(docs) == k:
