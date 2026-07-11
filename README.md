@@ -63,7 +63,7 @@ Both backends run the same eight logical steps. **Parsing and chunking are alway
 | 8 | synthesize | Gemma4 · Ollama | Claude Sonnet · Bedrock |
 
 <details open>
-<summary><b>🖥️ Local backend — full pipeline</b></summary>
+<summary><b>🖥️ Local Backend</b></summary>
 
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
@@ -101,7 +101,7 @@ flowchart TB
 </details>
 
 <details>
-<summary><b>☁️ AWS backend — full pipeline</b></summary>
+<summary><b>☁️ AWS Backend</b></summary>
 
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
