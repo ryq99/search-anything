@@ -29,7 +29,7 @@ ollama pull gemma4:e4b # local LLM for summarization + synthesis
 
 ### AWS backend setup (only for `CLOUD_BACKEND=aws`)
 
-The AWS path authenticates via standard AWS credentials (env, profile, or role) — **no Anthropic API key required**. Provision the following before ingesting:
+Setup the followings before ingesting:
 
 - **AWS credentials** configured for S3, DynamoDB, and Bedrock.
 - **S3 bucket** (`S3_BUCKET`) — stores per-chunk `.txt` + `.metadata.json` sidecars under `chunks/{pipeline_config_hash}/`.
@@ -49,66 +49,94 @@ uv run main.py watch                           # watch books/ and auto-ingest
 
 ## Pipelines
 
-### Ingestion
+Both backends run the same eight logical steps. **Parsing and chunking are always local compute** — the backend only changes the models and infrastructure from **summarize** onward. The table compares them step by step; the tabs below show each backend's full end-to-end flow.
+
+| # | Step | Local | AWS |
+|---|---|---|---|
+| 1 | parse | docling / liteparse / plaintext | ← same (local) |
+| 2 | chunk | DoclingChunker / LiteParseChunker | ← same (local) |
+| 3 | summarize | Gemma4 · Ollama | Claude Haiku · Bedrock |
+| 4 | embed | Arctic Embed L v2 · HuggingFace | Titan Embed Text v2 · Bedrock KB (managed) |
+| 5 | store + register | Milvus Lite + JSON registry | S3 → Bedrock KB + DynamoDB |
+| 6 | embed query | Arctic Embed L v2 | Titan Embed Text v2 · KB-managed |
+| 7 | retrieve | Milvus `similarity_search` + `RETRIEVAL_EXPR` | Bedrock KB Retrieve + client-side filters |
+| 8 | synthesize | Gemma4 · Ollama | Claude Sonnet · Bedrock |
+
+<details open>
+<summary><b>🖥️ Local backend — full pipeline</b></summary>
 
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
-flowchart LR
-    A("Source file
-    PDF / MD / TXT")
-    B("ParseResult")
-    C("list[Chunk]")
-    D("Enriched Chunks")
-
-    A -- "1 · parse
-    docling / liteparse / plaintext" --> B
-    B -- "2 · chunk
-    DoclingChunker / LiteParseChunker" --> C
-    C -- "3 · summarize
-    Gemma4 / Claude Haiku" --> D
+flowchart TB
+    subgraph ING["Ingestion · local compute"]
+      direction LR
+      A("Source file
+      PDF / MD / TXT") -- "1 · parse" --> B("ParseResult")
+      B -- "2 · chunk" --> C("list[Chunk]")
+      C -- "3 · summarize
+      Gemma4 · Ollama" --> D("Enriched Chunks")
+    end
+    subgraph IDXG["Indexing"]
+      direction LR
+      D -- "check content_hash
+      + pipeline_config_hash" --> IDX{"indexed?"}
+      IDX -- "yes" --> SKIP(("skip"))
+      IDX -- "4 · embed
+      Arctic Embed L v2" --> V("Vectors")
+      V -- "5 · store" --> VS[("Milvus Lite")]
+      V -- "5 · register" --> REG[("JSON registry")]
+    end
+    subgraph INF["Inference"]
+      direction LR
+      Q("Question") -- "6 · embed
+      Arctic Embed L v2" --> QV("Query Vector")
+      QV -.-> VS
+      VS -- "7 · retrieve
+      top-K · RETRIEVAL_EXPR" --> R("Retrieved Chunks")
+      R -- "8 · synthesize
+      Gemma4 · Ollama" --> ANS("Answer")
+    end
 ```
 
-### Indexing
+</details>
+
+<details>
+<summary><b>☁️ AWS backend — full pipeline</b></summary>
 
 ```mermaid
 %%{init: {'look': 'handDrawn'}}%%
-flowchart LR
-    A("Enriched Chunks")
-    B{"indexed?"}
-    SKIP(("skip"))
-    V("Vectors")
-    VS[("Vector Store
-    Milvus Lite / Bedrock KB")]
-    REG[("Registry
-    JSON / DynamoDB")]
-
-    A -- "check hash" --> B
-    B -- "yes" --> SKIP
-    B -- "4 · embed
-    Arctic Embed L v2 / Titan Text Embed v2" --> V
-    V -- "5 · store" --> VS
-    V -- "5 · register" --> REG
+flowchart TB
+    subgraph ING["Ingestion · local compute"]
+      direction LR
+      A("Source file
+      PDF / MD / TXT") -- "1 · parse" --> B("ParseResult")
+      B -- "2 · chunk" --> C("list[Chunk]")
+      C -- "3 · summarize
+      Claude Haiku · Bedrock" --> D("Enriched Chunks")
+    end
+    subgraph IDXG["Indexing"]
+      direction LR
+      D -- "check content_hash
+      + pipeline_config_hash" --> IDX{"indexed?"}
+      IDX -- "yes" --> SKIP(("skip"))
+      IDX -- "4 · upload
+      .txt + .metadata.json" --> S3[("S3
+      chunks · per config-hash")]
+      S3 == "sync · embed
+      Titan Embed v2" ==> KB[("Bedrock KB")]
+      IDX -- "5 · register" --> DDB[("DynamoDB")]
+    end
+    subgraph INF["Inference"]
+      direction LR
+      Q("Question") -- "6 · embed + 7 · retrieve
+      Bedrock KB Retrieve API" --> KB
+      KB -- "top-K · client filters" --> R("Retrieved Chunks")
+      R -- "8 · synthesize
+      Claude Sonnet · Bedrock" --> ANS("Answer")
+    end
 ```
 
-### Inference
-
-```mermaid
-%%{init: {'look': 'handDrawn'}}%%
-flowchart LR
-    Q("Question")
-    QV("Query Vector")
-    VS[("Vector Store")]
-    R("Retrieved Chunks")
-    ANS("Answer")
-
-    Q -- "6 · embed
-    Arctic Embed L v2 / Titan Text Embed v2" --> QV
-    QV -.-> VS
-    VS -- "7 · retrieve
-    top-K · metadata filters" --> R
-    R -- "8 · synthesize
-    Gemma4 / Claude Sonnet" --> ANS
-```
+</details>
 
 ## Configuration
 
