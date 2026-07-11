@@ -45,6 +45,7 @@ class BedrockKBVectorStore:
                 "pipeline_config_hash": PIPELINE_CONFIG_HASH,
                 "chunk_index":         i,       # position in document (reading order)
                 "total_chunks":        total,   # for "chunk i of N" completeness
+                "page_numbers":        ",".join(str(p) for p in chunk.page_numbers),  # source-page citation
             }}
             self._s3.put_object(
                 Bucket=S3_BUCKET,
@@ -120,6 +121,7 @@ class _BedrockKBStore:
                     "filename":        meta.get("filename", ""),
                     "chunk_index":     meta.get("chunk_index", -1),
                     "total_chunks":    meta.get("total_chunks", -1),
+                    "page_numbers":    [int(p) for p in meta.get("page_numbers", "").split(",") if p],
                 },
             ))
             if len(docs) == k:

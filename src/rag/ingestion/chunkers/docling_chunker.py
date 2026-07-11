@@ -113,6 +113,12 @@ class DoclingChunker:
             if raw_heading:
                 hierarchy.update(raw_heading)
 
+            pages = sorted({
+                prov.page_no
+                for item in dl_chunk.meta.doc_items
+                for prov in item.prov
+            })
+
             chunks.append(Chunk(
                 text=dl_chunk.text,
                 enriched_text=self._chunker.contextualize(chunk=dl_chunk),
@@ -120,6 +126,7 @@ class DoclingChunker:
                 parent_headings=hierarchy.parent_path,
                 content_hash=parse_result.content_hash,
                 filename=parse_result.source_path.rsplit("/", 1)[-1],
+                page_numbers=pages,
             ))
 
         return chunks
