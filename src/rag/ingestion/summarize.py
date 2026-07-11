@@ -10,11 +10,17 @@ _SYSTEM = (
 
 async def _summarize_chunk(llm, semaphore: asyncio.Semaphore, chunk: Chunk) -> str:
     async with semaphore:
-        return await llm.acomplete(
-            system=_SYSTEM,
-            user=chunk.text,
-            max_tokens=SUMMARY_MAX_TOKENS,
-        )
+        try:
+            return await llm.acomplete(
+                system=_SYSTEM,
+                user=chunk.text,
+                max_tokens=SUMMARY_MAX_TOKENS,
+            )
+        except Exception as e:
+            # A single failed summary must not abort the whole document's gather().
+            # Fall back to truncated raw text so the chunk still carries usable context.
+            print(f"[summarize] Summary failed ({type(e).__name__}); using truncated text fallback.")
+            return chunk.text[:300]
 
 
 async def summarize_chunks(chunks: list[Chunk], llm) -> None:
