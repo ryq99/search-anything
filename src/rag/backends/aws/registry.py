@@ -39,4 +39,6 @@ class DynamoDBRegistry:
 
     def load_all(self) -> dict:
         items = self._table.scan()["Items"]
-        return {"books": {i["registry_key"]: i for i in items}}
+        # Rebuild the registry key from stored attributes (matches BookEntry.registry_key);
+        # registry_key itself is a computed property and not persisted on the item.
+        return {"books": {f"{i['content_hash']}_{i['pipeline_config_hash']}": i for i in items}}
