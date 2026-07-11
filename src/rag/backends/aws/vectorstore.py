@@ -1,3 +1,4 @@
+import hashlib
 import json
 import time
 
@@ -34,7 +35,11 @@ class BedrockKBVectorStore:
     def store(self, chunks: list[Chunk]) -> None:
         total = len(chunks)
         for i, chunk in enumerate(chunks):
-            key = f"chunks/{PIPELINE_CONFIG_HASH}/{chunk.content_hash}_{i}.txt"
+            # Content-addressed: stable id from the embedded text. Keeps the
+            # {content_hash}_ prefix so identical chunks stay per-document (citation-safe),
+            # while deduping exact-duplicate chunks within a document across re-runs.
+            chunk_id = hashlib.sha256(chunk.enriched_text.encode()).hexdigest()[:12]
+            key = f"chunks/{PIPELINE_CONFIG_HASH}/{chunk.content_hash}_{chunk_id}.txt"
             self._s3.put_object(Bucket=S3_BUCKET, Key=key, Body=chunk.enriched_text.encode())
             meta = {"metadataAttributes": {
                 "raw_text":            chunk.text,
@@ -42,6 +47,8 @@ class BedrockKBVectorStore:
                 "parent_headings":     chunk.parent_headings,
                 "summary":             chunk.summary,
                 "filename":            chunk.filename,
+                "content_hash":        chunk.content_hash,   # document id (group chunks by source)
+                "chunk_id":            chunk_id,             # stable per-chunk id
                 "pipeline_config_hash": PIPELINE_CONFIG_HASH,
                 "chunk_index":         i,       # position in document (reading order)
                 "total_chunks":        total,   # for "chunk i of N" completeness
@@ -111,6 +118,10 @@ class _BedrockKBStore:
             meta = r["metadata"]
             if meta.get("headings", "") in RETRIEVAL_EXCLUDE_HEADINGS:
                 continue
+            # Bedrock KB is one shared index over all past configs; keep only the
+            # current pipeline config (local Milvus gets this via a per-config .db).
+            if meta.get("pipeline_config_hash") != PIPELINE_CONFIG_HASH:
+                continue
             docs.append(Document(
                 page_content=r["content"]["text"],
                 metadata={
@@ -119,6 +130,8 @@ class _BedrockKBStore:
                     "parent_headings": meta.get("parent_headings", ""),
                     "summary":         meta.get("summary", ""),
                     "filename":        meta.get("filename", ""),
+                    "content_hash":    meta.get("content_hash", ""),
+                    "chunk_id":        meta.get("chunk_id", ""),
                     "chunk_index":     meta.get("chunk_index", -1),
                     "total_chunks":    meta.get("total_chunks", -1),
                     "page_numbers":    [int(p) for p in meta.get("page_numbers", "").split(",") if p],
