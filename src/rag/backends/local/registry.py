@@ -18,9 +18,6 @@ class JsonRegistry:
     def get(self, content_hash: str, pipeline_config_hash: str) -> dict:
         return self._load().get("books", {}).get(f"{content_hash}_{pipeline_config_hash}", {})
 
-    def load_all(self) -> dict:
-        return self._load()
-
     def _load(self) -> dict:
         if PROCESSED_BOOKS_PATH.exists():
             return json.loads(PROCESSED_BOOKS_PATH.read_text())

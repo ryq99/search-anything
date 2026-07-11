@@ -33,25 +33,16 @@ def index_source(source: Path | str) -> dict:
 
 
 def ingest_directory(directory: Path | None = None) -> list[dict]:
-    """Index all supported files in a directory, skipping already-indexed ones."""
+    """Index every supported file in a directory. Each file is an independent,
+    idempotent unit — index_source() runs its own registry check per book, so
+    there is no batch table scan (fits the event-driven, per-book ingestion model)."""
     directory = directory or BOOKS_DIR
     directory.mkdir(parents=True, exist_ok=True)
-    backend = get_backend()
-    all_entries = backend.registry.load_all().get("books", {})
-
-    results = []
-    for path in sorted(directory.iterdir()):
-        if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-            continue
-        already = any(
-            e.get("filename") == path.name and e.get("pipeline_config_hash") == PIPELINE_CONFIG_HASH
-            for e in all_entries.values()
-        )
-        if already:
-            print(f"[pipeline] Skipping (already indexed, config={PIPELINE_CONFIG_HASH}): {path.name}")
-            continue
-        results.append(index_source(path))
-    return results
+    return [
+        index_source(path)
+        for path in sorted(directory.iterdir())
+        if path.suffix.lower() in SUPPORTED_EXTENSIONS
+    ]
 
 
 def start_watcher(books_dir: Path | None = None) -> None:
@@ -130,11 +121,11 @@ def main():
         else:
             results = ingest_directory(BOOKS_DIR)
         if results:
-            print(f"\nIndexed {len(results)} new file(s):")
+            print(f"\nProcessed {len(results)} file(s):")
             for r in results:
                 print(f"  - {r['filename']} ({r['chunk_count']} chunks)")
         else:
-            print("No new files to index.")
+            print("No supported files to ingest.")
 
     else:
         parser.print_help()
