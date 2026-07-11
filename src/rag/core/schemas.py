@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,7 @@ class Chunk:
     content_hash: str    # hex string — ties chunk back to its source document
     filename: str
     summary: str = ""    # 1-2 sentence summary filled by summarize step
+    page_numbers: list[int] = field(default_factory=list)  # source pages this chunk spans (docling only)
 
 
 @dataclass

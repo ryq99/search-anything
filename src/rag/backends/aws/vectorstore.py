@@ -1,3 +1,4 @@
+import hashlib
 import json
 import time
 
@@ -10,6 +11,7 @@ from rag.config import (
     S3_BUCKET, BEDROCK_KNOWLEDGE_BASE_ID, BEDROCK_DATA_SOURCE_ID,
     PIPELINE_CONFIG_HASH,
     KB_SYNC_POLL_INTERVAL, KB_SYNC_TIMEOUT,
+    RETRIEVAL_EXCLUDE_HEADINGS,
 )
 
 
@@ -31,8 +33,13 @@ class BedrockKBVectorStore:
         self._runtime = boto3.client("bedrock-agent-runtime", region_name=BEDROCK_REGION)
 
     def store(self, chunks: list[Chunk]) -> None:
+        total = len(chunks)
         for i, chunk in enumerate(chunks):
-            key = f"chunks/{PIPELINE_CONFIG_HASH}/{chunk.content_hash}_{i}.txt"
+            # Content-addressed: stable id from the embedded text. Keeps the
+            # {content_hash}_ prefix so identical chunks stay per-document (citation-safe),
+            # while deduping exact-duplicate chunks within a document across re-runs.
+            chunk_id = hashlib.sha256(chunk.enriched_text.encode()).hexdigest()[:12]
+            key = f"chunks/{PIPELINE_CONFIG_HASH}/{chunk.content_hash}_{chunk_id}.txt"
             self._s3.put_object(Bucket=S3_BUCKET, Key=key, Body=chunk.enriched_text.encode())
             meta = {"metadataAttributes": {
                 "raw_text":            chunk.text,
@@ -40,7 +47,12 @@ class BedrockKBVectorStore:
                 "parent_headings":     chunk.parent_headings,
                 "summary":             chunk.summary,
                 "filename":            chunk.filename,
+                "content_hash":        chunk.content_hash,   # document id (group chunks by source)
+                "chunk_id":            chunk_id,             # stable per-chunk id
                 "pipeline_config_hash": PIPELINE_CONFIG_HASH,
+                "chunk_index":         i,       # position in document (reading order)
+                "total_chunks":        total,   # for "chunk i of N" completeness
+                "page_numbers":        ",".join(str(p) for p in chunk.page_numbers),  # source-page citation
             }}
             self._s3.put_object(
                 Bucket=S3_BUCKET,
@@ -91,25 +103,40 @@ class _BedrockKBStore:
         self._runtime = runtime
 
     def similarity_search(self, query: str, k: int, expr: str = None) -> list[Document]:
-        # expr is Milvus-style syntax — not supported by Bedrock KB; ignored here.
-        # Use BEDROCK_RETRIEVAL_FILTER env var for AWS-native metadata filtering if needed.
+        # Bedrock KB has no Milvus-style expr filter (expr is ignored). Over-fetch,
+        # then drop excluded headings client-side — mirrors the local backend's
+        # RETRIEVAL_EXPR "headings != 'Contents'". 100 is Bedrock's max numberOfResults.
         resp = self._runtime.retrieve(
             knowledgeBaseId=BEDROCK_KNOWLEDGE_BASE_ID,
             retrievalQuery={"text": query},
             retrievalConfiguration={
-                "vectorSearchConfiguration": {"numberOfResults": k},
+                "vectorSearchConfiguration": {"numberOfResults": min(k * 2, 100)},
             },
         )
-        return [
-            Document(
+        docs = []
+        for r in resp["retrievalResults"]:
+            meta = r["metadata"]
+            if meta.get("headings", "") in RETRIEVAL_EXCLUDE_HEADINGS:
+                continue
+            # Bedrock KB is one shared index over all past configs; keep only the
+            # current pipeline config (local Milvus gets this via a per-config .db).
+            if meta.get("pipeline_config_hash") != PIPELINE_CONFIG_HASH:
+                continue
+            docs.append(Document(
                 page_content=r["content"]["text"],
                 metadata={
-                    "raw_text":        r["metadata"].get("raw_text", ""),
-                    "headings":        r["metadata"].get("headings", ""),
-                    "parent_headings": r["metadata"].get("parent_headings", ""),
-                    "summary":         r["metadata"].get("summary", ""),
-                    "filename":        r["metadata"].get("filename", ""),
+                    "raw_text":        meta.get("raw_text", ""),
+                    "headings":        meta.get("headings", ""),
+                    "parent_headings": meta.get("parent_headings", ""),
+                    "summary":         meta.get("summary", ""),
+                    "filename":        meta.get("filename", ""),
+                    "content_hash":    meta.get("content_hash", ""),
+                    "chunk_id":        meta.get("chunk_id", ""),
+                    "chunk_index":     meta.get("chunk_index", -1),
+                    "total_chunks":    meta.get("total_chunks", -1),
+                    "page_numbers":    [int(p) for p in meta.get("page_numbers", "").split(",") if p],
                 },
-            )
-            for r in resp["retrievalResults"]
-        ]
+            ))
+            if len(docs) == k:
+                break
+        return docs
