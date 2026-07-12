@@ -32,7 +32,13 @@ class BedrockKBVectorStore:
         self._agent   = boto3.client("bedrock-agent", region_name=BEDROCK_REGION)
         self._runtime = boto3.client("bedrock-agent-runtime", region_name=BEDROCK_REGION)
 
-    def store(self, chunks: list[Chunk]) -> None:
+    def store(self, chunks: list[Chunk], superseded: list[str] | None = None) -> None:
+        # Remove older versions of this document first; the single ingestion job
+        # below syncs both the deletions and the new objects, so the KB never
+        # serves the old and new version of the same document at once.
+        for old_content_hash in (superseded or []):
+            self._delete_document(old_content_hash)
+
         total = len(chunks)
         for i, chunk in enumerate(chunks):
             # Content-addressed: stable id from the embedded text. Keeps the
@@ -67,6 +73,19 @@ class BedrockKBVectorStore:
         print(f"[vectorstore] KB ingestion job {job_id} started — waiting for sync...")
         self._wait_for_sync(job_id)
         print(f"[vectorstore] KB sync complete — {len(chunks)} chunks searchable.")
+
+    def _delete_document(self, content_hash: str) -> None:
+        """Delete all S3 objects (chunks + metadata sidecars) for one document
+        version under the current config prefix."""
+        prefix = f"chunks/{PIPELINE_CONFIG_HASH}/{content_hash}_"
+        to_delete = []
+        paginator = self._s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=prefix):
+            to_delete.extend({"Key": obj["Key"]} for obj in page.get("Contents", []))
+        for i in range(0, len(to_delete), 1000):  # delete_objects caps at 1000/call
+            self._s3.delete_objects(Bucket=S3_BUCKET, Delete={"Objects": to_delete[i:i + 1000]})
+        if to_delete:
+            print(f"[vectorstore] Superseded {content_hash[:10]}... — removed {len(to_delete)} objects.")
 
     def _wait_for_sync(self, job_id: str) -> None:
         """Block until the KB ingestion job reaches a terminal state.

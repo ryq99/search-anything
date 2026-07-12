@@ -32,8 +32,10 @@ class MilvusVectorStore:
             model_kwargs={"trust_remote_code": True},
         )
 
-    def store(self, chunks: list[Chunk]) -> None:
+    def store(self, chunks: list[Chunk], superseded: list[str] | None = None) -> None:
         """Embed and persist chunks. Converts Chunk -> langchain Document at this boundary."""
+        # TODO(local supersede follow-up): delete old vectors for `superseded`
+        # content_hashes before adding. No-op for now (JsonRegistry never reports any).
         docs = self._to_documents(chunks)
         if not Path(MILVUS_URI).exists():
             print("[vectorstore] Creating new Milvus collection...")
