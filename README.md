@@ -47,6 +47,22 @@ uv run main.py watch                           # watch books/ and auto-ingest
 
 > **Note**: Re-running ingest is safe — already-processed files are skipped. A file is considered "already processed" when its `content_hash` (SHA-256 of the raw file bytes) **and** its `pipeline_config_hash` both match an existing entry. The `pipeline_config_hash` fingerprints every method decision in the pipeline (parser, chunker, chunk settings, embedding + summary models), so changing *any* of them — not just the parser — re-processes the file as a new version. On the AWS backend, `ingest` blocks until the Bedrock KB sync job reports `COMPLETE` (failing on `FAILED`/timeout), so a document is registered only after its chunks are actually searchable.
 
+## Document identity & versioning
+
+A document's identity is modeled on two axes:
+
+| Concept | Meaning | Managed by |
+|---|---|---|
+| `filename` | **logical document identity** — the stable handle for a document | you (keep filenames unique) |
+| `content_hash` | **version** of that document (SHA-256 of the bytes) within a config | **supersede** — automatic, at ingest |
+| `pipeline_config_hash` | **processing generation** (parser/chunker/embedding/summary config) | **prune** — manual (see below) |
+
+**Filename is the identity; content_hash is the version.** Two files with the same name are treated as the same document at different versions — so **filenames must be unique** (the system trusts this; it cannot distinguish an edited version from a genuinely different document that happens to share a name).
+
+**Supersede (automatic).** When you ingest a file whose name already exists under the current config but with *different* content, the older version's indexed data (chunks, vectors, registry row) is removed **in the same sync that adds the new version** — so a query never sees two versions of the same document at once. Re-ingesting an *identical* file (same `content_hash`) is a no-op, skipped by the idempotency check. Supersede is scoped to the **current** `pipeline_config_hash`.
+
+**Prune (manual).** Copies of a document indexed under an *older* `pipeline_config_hash` are not touched by supersede — they remain in storage (invisible to queries via the config-scoped retrieval filter) until removed by config-level pruning.
+
 ## Pipelines
 
 Both backends run the same eight logical steps. **Parsing and chunking are always local compute** — the backend only changes the models and infrastructure from **summarize** onward. The table compares them step by step; the tabs below show each backend's full end-to-end flow.
