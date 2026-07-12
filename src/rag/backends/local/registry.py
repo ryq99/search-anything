@@ -19,9 +19,14 @@ class JsonRegistry:
         return self._load().get("books", {}).get(f"{content_hash}_{pipeline_config_hash}", {})
 
     def find_superseded(self, filename: str, pipeline_config_hash: str, content_hash: str) -> list[str]:
-        # TODO(local supersede follow-up): return prior versions and wire Milvus
-        # vector deletion. Kept as a no-op so local behavior is unchanged for now.
-        return []
+        """Older versions of the same document: same filename + config, different content."""
+        return [
+            e["content_hash"]
+            for e in self._load().get("books", {}).values()
+            if e.get("filename") == filename
+            and e.get("pipeline_config_hash") == pipeline_config_hash
+            and e.get("content_hash") != content_hash
+        ]
 
     def delete(self, content_hash: str, pipeline_config_hash: str) -> None:
         data = self._load()

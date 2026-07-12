@@ -33,9 +33,19 @@ class MilvusVectorStore:
         )
 
     def store(self, chunks: list[Chunk], superseded: list[str] | None = None) -> None:
-        """Embed and persist chunks. Converts Chunk -> langchain Document at this boundary."""
-        # TODO(local supersede follow-up): delete old vectors for `superseded`
-        # content_hashes before adding. No-op for now (JsonRegistry never reports any).
+        """Embed and persist chunks. Converts Chunk -> langchain Document at this boundary.
+
+        Older versions of the same document (`superseded` content_hashes) are deleted
+        first, matched by the same binary_hash used in _to_documents, so a query never
+        sees the old and new version at once.
+        """
+        if superseded and Path(MILVUS_URI).exists():
+            store = self._connect()
+            for old_content_hash in superseded:
+                binary_hash = int(old_content_hash, 16) % (2 ** 63)
+                store.delete(expr=f"binary_hash == {binary_hash}")
+                print(f"[vectorstore] Superseded {old_content_hash[:10]}... — removed old vectors.")
+
         docs = self._to_documents(chunks)
         if not Path(MILVUS_URI).exists():
             print("[vectorstore] Creating new Milvus collection...")
