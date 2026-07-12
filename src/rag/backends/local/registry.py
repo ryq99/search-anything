@@ -18,6 +18,16 @@ class JsonRegistry:
     def get(self, content_hash: str, pipeline_config_hash: str) -> dict:
         return self._load().get("books", {}).get(f"{content_hash}_{pipeline_config_hash}", {})
 
+    def find_superseded(self, filename: str, pipeline_config_hash: str, content_hash: str) -> list[str]:
+        # TODO(local supersede follow-up): return prior versions and wire Milvus
+        # vector deletion. Kept as a no-op so local behavior is unchanged for now.
+        return []
+
+    def delete(self, content_hash: str, pipeline_config_hash: str) -> None:
+        data = self._load()
+        data.get("books", {}).pop(f"{content_hash}_{pipeline_config_hash}", None)
+        PROCESSED_BOOKS_PATH.write_text(json.dumps(data, indent=2))
+
     def _load(self) -> dict:
         if PROCESSED_BOOKS_PATH.exists():
             return json.loads(PROCESSED_BOOKS_PATH.read_text())

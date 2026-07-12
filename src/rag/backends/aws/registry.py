@@ -36,3 +36,28 @@ class DynamoDBRegistry:
             Key={"content_hash": content_hash, "pipeline_config_hash": pipeline_config_hash}
         )
         return r.get("Item", {})
+
+    def find_superseded(self, filename: str, pipeline_config_hash: str, content_hash: str) -> list[str]:
+        """Older versions of the same document: same filename + config, different content.
+
+        Cold-path admin scan (paginated). Fine at current scale; a GSI on `filename`
+        is the path if the table grows large.
+        """
+        hashes: list[str] = []
+        kwargs = {
+            "FilterExpression": Attr("filename").eq(filename)
+            & Attr("pipeline_config_hash").eq(pipeline_config_hash)
+            & Attr("content_hash").ne(content_hash),
+            "ProjectionExpression": "content_hash",
+        }
+        while True:
+            resp = self._table.scan(**kwargs)
+            hashes.extend(i["content_hash"] for i in resp["Items"])
+            if "LastEvaluatedKey" not in resp:
+                return hashes
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+    def delete(self, content_hash: str, pipeline_config_hash: str) -> None:
+        self._table.delete_item(
+            Key={"content_hash": content_hash, "pipeline_config_hash": pipeline_config_hash}
+        )
