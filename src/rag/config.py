@@ -119,10 +119,6 @@ SYNTHESIS_MAX_TOKENS   = 8192
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
 
-# --- Secrets (validated at use, not at import) ---
-HF_TOKEN          = os.getenv("HF_TOKEN", "")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-
 # --- AWS backend ---
 AWS_REGION                = os.getenv("AWS_REGION", "us-west-2")
 S3_BUCKET                 = os.getenv("S3_BUCKET", "")
@@ -131,6 +127,29 @@ BEDROCK_REGION            = os.getenv("BEDROCK_REGION", "us-west-2")
 BEDROCK_KNOWLEDGE_BASE_ID = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "")
 BEDROCK_DATA_SOURCE_ID    = os.getenv("BEDROCK_DATA_SOURCE_ID", "")
 BEDROCK_EMBED_MODEL_ID    = os.getenv("BEDROCK_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")
+
+
+# --- Secrets ---
+def _load_secret(env_var: str, ssm_name: str) -> str:
+    """Env var if set, else fetch from AWS SSM Parameter Store and export it so
+    libraries that read the env directly (e.g. huggingface_hub) pick it up.
+    Fails soft — missing boto3/creds/param yields "" and never breaks a run."""
+    val = os.getenv(env_var, "")
+    if val:
+        return val
+    try:
+        import boto3
+        val = boto3.client("ssm", region_name=AWS_REGION).get_parameter(
+            Name=ssm_name, WithDecryption=True,
+        )["Parameter"]["Value"]
+        os.environ[env_var] = val
+        return val
+    except Exception:
+        return ""
+
+
+HF_TOKEN          = _load_secret("HF_TOKEN", "hf_hub_access_token")
+ANTHROPIC_API_KEY = _load_secret("ANTHROPIC_API_KEY", "anthropic_api_key")
 
 # KB ingestion job sync polling — store() blocks until the job reaches a terminal state.
 KB_SYNC_POLL_INTERVAL     = int(os.getenv("KB_SYNC_POLL_INTERVAL", "5"))    # seconds between status checks
