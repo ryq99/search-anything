@@ -1,7 +1,7 @@
 import json
 
 from rag.core.schemas import BookEntry
-from rag.config import PROCESSED_BOOKS_PATH
+from rag.config import REGISTRY_PATH
 
 
 class JsonRegistry:
@@ -13,7 +13,7 @@ class JsonRegistry:
     def register(self, entry: BookEntry) -> None:
         data = self._load()
         data.setdefault("books", {})[entry.registry_key] = entry.to_dict()
-        PROCESSED_BOOKS_PATH.write_text(json.dumps(data, indent=2))
+        self._save(data)
 
     def get(self, content_hash: str, pipeline_config_hash: str) -> dict:
         return self._load().get("books", {}).get(f"{content_hash}_{pipeline_config_hash}", {})
@@ -31,9 +31,13 @@ class JsonRegistry:
     def delete(self, content_hash: str, pipeline_config_hash: str) -> None:
         data = self._load()
         data.get("books", {}).pop(f"{content_hash}_{pipeline_config_hash}", None)
-        PROCESSED_BOOKS_PATH.write_text(json.dumps(data, indent=2))
+        self._save(data)
 
     def _load(self) -> dict:
-        if PROCESSED_BOOKS_PATH.exists():
-            return json.loads(PROCESSED_BOOKS_PATH.read_text())
+        if REGISTRY_PATH.exists():
+            return json.loads(REGISTRY_PATH.read_text())
         return {"books": {}}
+
+    def _save(self, data: dict) -> None:
+        REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        REGISTRY_PATH.write_text(json.dumps(data, indent=2))
