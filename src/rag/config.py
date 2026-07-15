@@ -14,10 +14,10 @@ CLOUD_BACKEND = os.getenv("CLOUD_BACKEND", "local")  # "local" | "aws"
 # config.py lives at src/rag/config.py, so three .parent hops reach the repo root
 # (config.py -> rag -> src -> repo root) where books/, data/, vector_store/ live.
 PROJECT_ROOT         = Path(__file__).parent.parent.parent
-BOOKS_DIR            = PROJECT_ROOT / "books"
-DATA_DIR             = PROJECT_ROOT / "data"
-VECTOR_STORE_DIR     = PROJECT_ROOT / "vector_store"
-PROCESSED_BOOKS_PATH = PROJECT_ROOT / "processed_books.json"
+BOOKS_DIR        = PROJECT_ROOT / "books"
+DATA_DIR         = PROJECT_ROOT / "data"
+VECTOR_STORE_DIR = PROJECT_ROOT / "vector_store"
+REGISTRY_PATH    = DATA_DIR / "registry.json"   # local ingestion ledger (all processed docs + metadata)
 
 # ── Ingestion ────────────────────────────────────────────────────────────────
 
