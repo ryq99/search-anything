@@ -60,7 +60,7 @@ _pipeline_config = {
                              else os.getenv("BEDROCK_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0"),
     "summary_model":         os.getenv("LOCAL_SUMMARY_MODEL", "gemma4:e4b")
                              if CLOUD_BACKEND == "local"
-                             else os.getenv("CLOUD_SUMMARY_MODEL", "claude-haiku-4-5-20251001"),
+                             else os.getenv("CLOUD_SUMMARY_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
 }
 PIPELINE_CONFIG_HASH = hashlib.sha256(
     json.dumps(_pipeline_config, sort_keys=True).encode()
@@ -77,7 +77,7 @@ MILVUS_URI        = str(VECTOR_STORE_DIR / f"{PIPELINE_CONFIG_HASH}.db")
 # Chunk summarization runs at indexing time to enrich each chunk before storage.
 LOCAL_LLM_BASE_URL  = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434")
 LOCAL_SUMMARY_MODEL = os.getenv("LOCAL_SUMMARY_MODEL", "gemma4:e4b")
-CLOUD_SUMMARY_MODEL = os.getenv("CLOUD_SUMMARY_MODEL", "us.anthropic.claude-haiku-4-5-20251001")
+CLOUD_SUMMARY_MODEL = os.getenv("CLOUD_SUMMARY_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 SUMMARY_SEMAPHORE   = 5
 SUMMARY_MAX_TOKENS  = 1000
 
@@ -114,7 +114,7 @@ RETRIEVAL_EXCLUDE_HEADINGS = {
 # --- Synthesis ---
 # Answer synthesis runs at query time to generate the final response.
 LOCAL_SYNTHESIS_MODEL  = os.getenv("LOCAL_SYNTHESIS_MODEL", "gemma4:e4b")
-CLOUD_SYNTHESIS_MODEL  = os.getenv("CLOUD_SYNTHESIS_MODEL", "us.anthropic.claude-sonnet-4-6-20250514")
+CLOUD_SYNTHESIS_MODEL  = os.getenv("CLOUD_SYNTHESIS_MODEL", "us.anthropic.claude-sonnet-4-6")
 SYNTHESIS_MAX_TOKENS   = 8192
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
