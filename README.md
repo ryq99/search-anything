@@ -177,7 +177,7 @@ All tunables are in [src/rag/config.py](src/rag/config.py), overridable via `.en
 | `CHUNK_MERGE_LIST_ITEMS` | `true` | Keep consecutive list items together in one chunk |
 | `LOCAL_LLM_BASE_URL` | `http://localhost:11434` | Ollama server URL |
 | `LOCAL_SUMMARY_MODEL` | `gemma4:e4b` | Local summarization model (Ollama) |
-| `CLOUD_SUMMARY_MODEL` | `us.anthropic.claude-haiku-4-5-20251001` | Cloud summarization model (Bedrock cross-region id) |
+| `CLOUD_SUMMARY_MODEL` | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | Cloud summarization model (Bedrock cross-region id) |
 
 ### Indexing
 
@@ -197,7 +197,7 @@ All tunables are in [src/rag/config.py](src/rag/config.py), overridable via `.en
 | `RETRIEVAL_EXPR` | `headings != 'Contents'` | Milvus boolean filter expression (**local only** — ignored by AWS) |
 | `RETRIEVAL_EXCLUDE_HEADINGS` | `Contents` | Comma-separated headings dropped from AWS retrieval (client-side; the AWS equivalent of `RETRIEVAL_EXPR`) |
 | `LOCAL_SYNTHESIS_MODEL` | `gemma4:e4b` | Local answer-synthesis model (Ollama) |
-| `CLOUD_SYNTHESIS_MODEL` | `us.anthropic.claude-sonnet-4-6-20250514` | Cloud answer-synthesis model (Bedrock cross-region id) |
+| `CLOUD_SYNTHESIS_MODEL` | `us.anthropic.claude-sonnet-4-6` | Cloud answer-synthesis model (Bedrock cross-region id) |
 
 ### Secrets & AWS
 
