@@ -9,6 +9,15 @@ _SYSTEM = (
     "Return only the summary itself — no headings, labels, preamble, or markdown formatting."
 )
 
+# JSON Schema for structured (tool-use) summarization on backends that support it.
+_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string", "description": "1-2 sentence summary, no headings or labels"},
+    },
+    "required": ["summary"],
+}
+
 
 def _clean(summary: str) -> str:
     """Strip a leading 'Summary' heading/label the model sometimes adds despite
@@ -21,6 +30,11 @@ def _clean(summary: str) -> str:
 async def _summarize_chunk(llm, semaphore: asyncio.Semaphore, chunk: Chunk) -> str:
     async with semaphore:
         try:
+            # Prefer constrained structured output (guaranteed clean field) when the
+            # backend supports it; otherwise free-text + regex clean-up.
+            if hasattr(llm, "acomplete_structured"):
+                out = await llm.acomplete_structured(_SYSTEM, chunk.text, _SCHEMA, SUMMARY_MAX_TOKENS)
+                return _clean(out.get("summary", ""))
             return _clean(await llm.acomplete(
                 system=_SYSTEM,
                 user=chunk.text,
