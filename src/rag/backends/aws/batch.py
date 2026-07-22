@@ -27,3 +27,27 @@ def build_summary_record(record_id: str, system: str, user: str, schema: dict, m
 def build_batch_jsonl(records: list[dict]) -> str:
     """Serialize records to the JSONL body uploaded to S3 as the batch job input."""
     return "\n".join(json.dumps(r) for r in records)
+
+
+def parse_summary_output(jsonl: str) -> dict[str, str]:
+    """Map recordId -> summary from a Bedrock Batch Inference output JSONL.
+
+    Each line is {"recordId", "modelOutput": {anthropic response}} on success; the
+    summary is the `emit` tool_use block's input. Records that errored or lack a
+    tool_use block are omitted so the caller can apply its truncated-text fallback.
+    """
+    summaries: dict[str, str] = {}
+    for line in jsonl.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        rec = json.loads(line)
+        rid = rec.get("recordId")
+        model_output = rec.get("modelOutput")
+        if not rid or not model_output:
+            continue
+        for block in model_output.get("content", []):
+            if block.get("type") == "tool_use" and "summary" in block.get("input", {}):
+                summaries[rid] = block["input"]["summary"]
+                break
+    return summaries
