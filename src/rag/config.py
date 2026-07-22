@@ -128,6 +128,14 @@ BEDROCK_KNOWLEDGE_BASE_ID = os.getenv("BEDROCK_KNOWLEDGE_BASE_ID", "")
 BEDROCK_DATA_SOURCE_ID    = os.getenv("BEDROCK_DATA_SOURCE_ID", "")
 BEDROCK_EMBED_MODEL_ID    = os.getenv("BEDROCK_EMBED_MODEL_ID", "amazon.titan-embed-text-v2:0")
 
+# --- Bedrock Batch Inference (optional; ~50% cheaper summarization, async) ---
+# Reserved for the batch summarization path (createModelInvocationJob): write a
+# JSONL of chunk prompts to S3, run one async job, read results back. Requires a
+# service role Bedrock assumes for S3 I/O. Min 100 records per job.
+SUMMARY_BATCH_MODE      = os.getenv("SUMMARY_BATCH_MODE", "false").lower() == "true"
+BEDROCK_BATCH_ROLE_ARN  = os.getenv("BEDROCK_BATCH_ROLE_ARN", "")
+BEDROCK_BATCH_S3_PREFIX = os.getenv("BEDROCK_BATCH_S3_PREFIX", "batch/")
+
 
 # --- Secrets ---
 def _load_secret(env_var: str, ssm_name: str) -> str:
