@@ -29,6 +29,18 @@ def build_batch_jsonl(records: list[dict]) -> str:
     return "\n".join(json.dumps(r) for r in records)
 
 
+def build_job_request(job_name: str, model_id: str, role_arn: str, input_uri: str, output_uri: str) -> dict:
+    """Kwargs for bedrock `create_model_invocation_job`. `input_uri` points at the
+    input JSONL in S3; `output_uri` is the output prefix Bedrock writes results to."""
+    return {
+        "jobName": job_name,
+        "modelId": model_id,
+        "roleArn": role_arn,
+        "inputDataConfig": {"s3InputDataConfig": {"s3Uri": input_uri}},
+        "outputDataConfig": {"s3OutputDataConfig": {"s3Uri": output_uri}},
+    }
+
+
 def parse_summary_output(jsonl: str) -> dict[str, str]:
     """Map recordId -> summary from a Bedrock Batch Inference output JSONL.
 
